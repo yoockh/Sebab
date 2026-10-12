@@ -32,6 +32,7 @@ type Facts struct {
 	RetryAfter   time.Duration
 	Families     map[string]string // "ipv4" -> "refused"
 	Proxy        string
+	Actual       string // value seen by a failed assertion
 }
 
 // Outcome is what a probe concluded: one code plus facts.
@@ -226,6 +227,10 @@ func describe(o Outcome) (string, string) {
 	case HTTPUnexpRedir:
 		return fmt.Sprintf("redirected to unexpected host %s", f.RedirectHost),
 			"This can be a login page or a captive portal. Add the host to allowed_redirect_hosts if it is expected."
+	case HTTPAssertion:
+		return "assertion failed: " + f.Detail,
+			fmt.Sprintf("The server answered %s but not with the expected content (an error page, a login page or a captive portal).",
+				statusText(f.HTTPStatus))
 	case HTTPRedirLoop:
 		return fmt.Sprintf("more than %d redirects", 10), "The server redirects in a loop. Check its redirect rules."
 	}

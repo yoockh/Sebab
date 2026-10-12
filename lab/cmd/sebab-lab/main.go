@@ -101,6 +101,7 @@ func Config(l *lab.Lab, caPath string) string {
 	mon("wrong-status", "HTTP wrong status", "url", h("/ok"), "expect_status = [204]\n")
 	mon("redirect-away", "HTTP unexpected redirect", "url", h("/away"), "")
 	mon("redirect-loop", "HTTP redirect loop", "url", h("/loop"), "")
+	mon("captive", "HTTP assertion (captive portal)", "url", h("/portal"), "assert = [{ type = \"body\", value = \"ok\" }]\n")
 	mon("vpn", "Needs VPN sebab0", "url", h("/ok"), "requires_vpn = { interface = \"sebab0\" }\n")
 	return b.String()
 }

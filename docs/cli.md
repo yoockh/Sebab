@@ -76,6 +76,12 @@ A value given with `--secret-stdin` or `--secret-file` is stored under the
 reference name (default `<id>-token`) in the keyring, or in the 0600 secrets
 file when no keyring is running.
 
+Assertions (repeatable `--assert`, Phase 3) check the response content after the status code:
+`body=TEXT` (body contains TEXT), `json:PATH=VALUE` (for example `json:data.items[0].state=ready`;
+omit `=VALUE` to only require the path), `header:NAME=VALUE` (header contains VALUE). Prefix `!` to
+negate (`--assert '!body=Maintenance'`), `--assert none` clears them. A failing assertion is
+`HTTP_ASSERTION_FAILED`, which also catches captive portals that answer 200 with a login page.
+
 Other flags: `--interval`, `--timeout`, `--slow` (HTTP_SLOW threshold),
 `--expect`, `--vpn IFACE`, `--ca-file PEM`, `--insecure`, `--method GET|HEAD`,
 `--no-follow`, `--allow-redirect host1,host2`, `--paused`.

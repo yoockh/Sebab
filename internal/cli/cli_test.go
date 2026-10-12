@@ -265,3 +265,34 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatal("unknown command")
 	}
 }
+
+func TestCheckAndMonitorAssertions(t *testing.T) {
+	w := newWorld(t)
+	code, out, _ := w.run("", "check", "--json", "--assert", "json:items[0].state=ready", "--assert", "header:Content-Type=json",
+		w.url("/json"))
+	if code != ExitOK {
+		t.Fatalf("passing assertions: %d %s", code, out)
+	}
+	code, out, _ = w.run("", "check", "--json", "--assert", `body="status":"ok"`, w.url("/portal"))
+	if c := decodeCheck(t, out); code != ExitHTTP || c.Cause.Code != "HTTP_ASSERTION_FAILED" {
+		t.Fatalf("captive portal: %d %s", code, out)
+	}
+	if code, _, _ := w.run("", "check", "--assert", "xpath:/a", w.url("/json")); code != ExitUsage {
+		t.Fatal("bad assertion syntax should be a usage error")
+	}
+	if code, _, e := w.run("", "monitor", "add", "--name", "J", "--target", w.url("/json"), "--assert", "!body=Maintenance",
+		"--assert", "json:status=ok", "--no-test"); code != 0 {
+		t.Fatal(e)
+	}
+	cfg, _ := config.Load(w.configPath())
+	if len(cfg.Monitors[0].Assert) != 2 || !cfg.Monitors[0].Assert[0].Negate || cfg.Monitors[0].Assert[1].Path != "status" {
+		t.Fatalf("stored assertions %+v", cfg.Monitors[0].Assert)
+	}
+	if code, _, _ := w.run("", "monitor", "edit", "j", "--assert", "none", "--no-test"); code != 0 {
+		t.Fatal("clear assertions")
+	}
+	cfg, _ = config.Load(w.configPath())
+	if len(cfg.Monitors[0].Assert) != 0 {
+		t.Fatalf("assertions should be cleared: %+v", cfg.Monitors[0].Assert)
+	}
+}

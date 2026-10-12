@@ -120,6 +120,45 @@ type Monitor struct {
 	CAFile               string            `toml:"ca_file,omitempty"`
 	FollowRedirects      *bool             `toml:"follow_redirects,omitempty"`
 	AllowedRedirectHosts []string          `toml:"allowed_redirect_hosts,omitempty"`
+	Assert               []Assertion       `toml:"assert,omitempty"`
+}
+
+// Assertion checks the HTTP response beyond its status code.
+//
+//	{ type = "body",   value = "ok" }                      body contains value
+//	{ type = "json",   path = "data.items[0].state", value = "ready" }
+//	{ type = "header", name = "Content-Type", value = "application/json" }
+//
+// An empty value for json/header only requires the path/header to exist.
+// negate = true inverts the check (for example "body must not contain Maintenance").
+type Assertion struct {
+	Type   string `toml:"type"`
+	Path   string `toml:"path,omitempty"`
+	Name   string `toml:"name,omitempty"`
+	Value  string `toml:"value,omitempty"`
+	Negate bool   `toml:"negate,omitempty"`
+}
+
+var jsonPathPattern = regexp.MustCompile(`^[A-Za-z0-9_$-]+(\[\d+\])*(\.[A-Za-z0-9_$-]+(\[\d+\])*)*$|^\[\d+\](\[\d+\])*(\.[A-Za-z0-9_$-]+(\[\d+\])*)*$`)
+
+func (a Assertion) problems() []string {
+	switch a.Type {
+	case "body":
+		if a.Value == "" {
+			return []string{"assert body needs a value"}
+		}
+	case "json":
+		if !jsonPathPattern.MatchString(a.Path) {
+			return []string{fmt.Sprintf("assert json path %q must look like data.items[0].state", a.Path)}
+		}
+	case "header":
+		if !headerName.MatchString(a.Name) {
+			return []string{fmt.Sprintf("assert header name %q is invalid", a.Name)}
+		}
+	default:
+		return []string{fmt.Sprintf("assert type %q must be body, json or header", a.Type)}
+	}
+	return nil
 }
 
 // Kind is "http" for URL monitors and "tcp" for raw targets.
@@ -283,6 +322,15 @@ func (m Monitor) Validate() []string {
 		}
 	}
 	probs = append(probs, m.Auth.problems()...)
+	if len(m.Assert) > 0 && m.Kind() != "http" {
+		add("assert only applies to url monitors")
+	}
+	if len(m.Assert) > 10 {
+		add("at most 10 assertions per monitor")
+	}
+	for _, a := range m.Assert {
+		probs = append(probs, a.problems()...)
+	}
 	if m.RequiresVPN != nil && !ifacePattern.MatchString(m.RequiresVPN.Interface) {
 		add("requires_vpn.interface %q is not a valid interface name", m.RequiresVPN.Interface)
 	}

@@ -41,7 +41,7 @@ func TestTaxonomyMatchesAppendixB(t *testing.T) {
 		}
 	}
 	for code := range Taxonomy {
-		if _, ok := appendixB[code]; !ok && code != TLSExpiringSoon {
+		if _, ok := appendixB[code]; !ok && code != TLSExpiringSoon && code != HTTPAssertion {
 			t.Errorf("%s is not in Appendix B", code)
 		}
 	}

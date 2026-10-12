@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yoockh/sebab/internal/config"
 	"github.com/yoockh/sebab/internal/diagnose"
 	"github.com/yoockh/sebab/internal/event"
 	"github.com/yoockh/sebab/internal/platform"
@@ -398,5 +399,24 @@ func TestLabHandshakeDetailIsShort(t *testing.T) {
 	_, d := e.check(t, httpSpec(t, fmt.Sprintf("https://app.lab.test:%d/", l.HandshakePort), l))
 	if strings.Contains(d.Summary, "Get \"") || strings.Contains(d.Summary, "https://") {
 		t.Errorf("summary should not carry Go's request wrapper: %q", d.Summary)
+	}
+}
+
+func TestLabAssertions(t *testing.T) {
+	l := startLab(t)
+	e := newEnv(t, l, platform.Online())
+	spec := httpSpec(t, l.HTTPURL("app.lab.test", "/json"), l)
+	spec.Assertions = []config.Assertion{{Type: "json", Path: "items[0].state", Value: "ready"},
+		{Type: "header", Name: "Content-Type", Value: "json"}}
+	if _, d := e.check(t, spec); d.Status != event.StatusUp {
+		t.Fatalf("assertions should pass: %+v", d)
+	}
+	// A captive portal answers 200 with the wrong content.
+	spec = httpSpec(t, l.HTTPURL("app.lab.test", "/portal"), l)
+	spec.Assertions = []config.Assertion{{Type: "body", Value: `"status":"ok"`}}
+	_, d := e.check(t, spec)
+	expect(t, d, want{diagnose.HTTPAssertion, event.LayerHTTP, event.SideTheirs, event.StatusDown})
+	if !strings.Contains(d.Summary, `body does not contain "\"status\":\"ok\""`) || !strings.Contains(d.Hint, "captive portal") {
+		t.Fatalf("text %q / %q", d.Summary, d.Hint)
 	}
 }

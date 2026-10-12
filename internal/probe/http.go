@@ -85,7 +85,12 @@ func (t *run) httpCheck(ctx context.Context) {
 		t.recordTimings(tr)
 		return
 	}
-	_, _ = io.CopyN(io.Discard, resp.Body, maxBodyBytes)
+	var body []byte
+	if len(t.spec.Assertions) > 0 {
+		body, _ = io.ReadAll(io.LimitReader(resp.Body, maxAssertBody))
+	} else {
+		_, _ = io.CopyN(io.Discard, resp.Body, maxBodyBytes)
+	}
 	resp.Body.Close()
 	t.recordTimings(tr)
 	if u.Scheme == "https" {
@@ -93,7 +98,7 @@ func (t *run) httpCheck(ctx context.Context) {
 	}
 	t.res.HTTPStatus = resp.StatusCode
 	t.res.TLSNotAfter = tr.notAfter
-	if f := t.evaluate(resp, tr); f != nil {
+	if f := t.evaluate(resp, tr, body); f != nil {
 		t.fail(f)
 		return
 	}
@@ -354,7 +359,7 @@ func (t *run) recordTimings(tr *httpTrace) {
 
 // evaluate maps the final response to an outcome: failures first, then
 // degradations (TLS expiring soon, slow response).
-func (t *run) evaluate(resp *http.Response, tr *httpTrace) *Failure {
+func (t *run) evaluate(resp *http.Response, tr *httpTrace, body []byte) *Failure {
 	code := resp.StatusCode
 	host := t.spec.URL.Hostname()
 	facts := diagnose.Facts{Host: host, HTTPStatus: code, Expected: t.spec.ExpectStatus}
@@ -376,6 +381,10 @@ func (t *run) evaluate(resp *http.Response, tr *httpTrace) *Failure {
 		default:
 			return &Failure{Code: diagnose.HTTPUnexpStatus, Facts: facts}
 		}
+	}
+	if desc, actual := checkAssertions(t.spec.Assertions, resp.Header, body); desc != "" {
+		facts.Detail, facts.Actual = desc, actual
+		return &Failure{Code: diagnose.HTTPAssertion, Facts: facts}
 	}
 	tr.mu.Lock()
 	expiring, notAfter := tr.expiring, tr.notAfter

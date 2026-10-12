@@ -9,7 +9,8 @@ import (
 // Code is a cause code.
 type Code string
 
-// Cause codes from PRD Appendix B, plus TLS_EXPIRING_SOON for Story 10.
+// Cause codes from PRD Appendix B, plus TLS_EXPIRING_SOON (Story 10) and
+// HTTP_ASSERTION_FAILED (Phase 3 assertions).
 const (
 	LocalNoLink     Code = "LOCAL_NO_LINK"
 	LocalNoRoute    Code = "LOCAL_NO_ROUTE"
@@ -40,6 +41,7 @@ const (
 	HTTPUnexpStatus Code = "HTTP_UNEXPECTED_STATUS"
 	HTTPUnexpRedir  Code = "HTTP_UNEXPECTED_REDIRECT"
 	HTTPRedirLoop   Code = "HTTP_REDIRECT_LOOP"
+	HTTPAssertion   Code = "HTTP_ASSERTION_FAILED"
 )
 
 // Spec is the static description of a code.
@@ -81,6 +83,7 @@ var Taxonomy = map[Code]Spec{
 	HTTPUnexpStatus: {event.LayerHTTP, event.SideTheirs, event.StatusDown, "Status not in expect_status"},
 	HTTPUnexpRedir:  {event.LayerHTTP, event.SideTheirs, event.StatusDown, "Redirected to an unexpected host"},
 	HTTPRedirLoop:   {event.LayerHTTP, event.SideTheirs, event.StatusDown, "More than 10 redirects"},
+	HTTPAssertion:   {event.LayerHTTP, event.SideTheirs, event.StatusDown, "Response content assertion failed"},
 }
 
 // LayerOf returns the layer of a code.

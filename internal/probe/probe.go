@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yoockh/sebab/internal/config"
 	"github.com/yoockh/sebab/internal/diagnose"
 	"github.com/yoockh/sebab/internal/event"
 	"github.com/yoockh/sebab/internal/platform"
@@ -61,6 +62,7 @@ type Spec struct {
 	RequiresVPN          string
 	InsecureTLS          bool
 	RootCAs              *x509.CertPool // nil means the system pool
+	Assertions           []config.Assertion
 }
 
 // Result is the outcome of one check.

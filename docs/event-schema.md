@@ -95,6 +95,7 @@ Codes: `CONFIG_INVALID`, `CONFIG_MISSING`, `SECRET_MISSING` (with `monitor`), `I
 | tls | `TLS_NOT_YET_VALID` | down | unknown (check the local clock) |
 | tls | `TLS_EXPIRING_SOON` | degraded | theirs |
 | http | `HTTP_BAD_GATEWAY`, `HTTP_UNAVAILABLE`, `HTTP_SERVER_ERROR`, `HTTP_CLIENT_ERROR`, `HTTP_TIMEOUT`, `HTTP_UNEXPECTED_STATUS`, `HTTP_UNEXPECTED_REDIRECT`, `HTTP_REDIRECT_LOOP` | down | theirs |
+| http | `HTTP_ASSERTION_FAILED` | down | theirs (response content did not match an `assert`) |
 | http | `HTTP_AUTH` | down | yours (token) |
 | http | `HTTP_RATE_LIMITED`, `HTTP_SLOW` | degraded | theirs |
 

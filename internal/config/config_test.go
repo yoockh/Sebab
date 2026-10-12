@@ -213,3 +213,31 @@ func TestTimeoutClampedBelowInterval(t *testing.T) {
 }
 
 func durPtr(d time.Duration) *Duration { v := Duration(d); return &v }
+
+func TestAssertionValidation(t *testing.T) {
+	ok := `[[monitor]]
+id = "a"
+name = "A"
+url = "https://a.example/"
+assert = [
+  { type = "body", value = "ok" },
+  { type = "json", path = "data.items[0].state", value = "ready" },
+  { type = "json", path = "[0].id" },
+  { type = "header", name = "Content-Type", value = "json" },
+  { type = "body", value = "Maintenance", negate = true },
+]
+`
+	if _, err := Parse([]byte(ok)); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{`{ type = "body" }`, `{ type = "json", path = "a..b" }`, `{ type = "header", name = "bad name" }`,
+		`{ type = "xpath", path = "/x" }`} {
+		src := "[[monitor]]\nid=\"a\"\nname=\"A\"\nurl=\"https://a.example/\"\nassert=[" + bad + "]\n"
+		if _, err := Parse([]byte(src)); err == nil {
+			t.Errorf("%s should be rejected", bad)
+		}
+	}
+	if _, err := Parse([]byte("[[monitor]]\nid=\"a\"\nname=\"A\"\ntarget=\"a.example:1\"\nassert=[{type=\"body\",value=\"x\"}]\n")); err == nil {
+		t.Error("tcp monitors cannot have assertions")
+	}
+}

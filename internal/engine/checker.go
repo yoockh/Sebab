@@ -80,7 +80,7 @@ func BuildSpec(s config.Settings, store *secret.Store, red *secret.Redactor) (pr
 	spec := probe.Spec{
 		Kind: m.Kind(), Timeout: s.Timeout, ExpectStatus: s.ExpectStatus, SlowThreshold: s.SlowThreshold,
 		TLSWarnDays: s.TLSWarnDays, FollowRedirects: s.FollowRedirects, AllowedRedirectHosts: m.AllowedRedirectHosts,
-		Method: m.Method, Headers: m.Headers, InsecureTLS: m.InsecureTLS,
+		Method: m.Method, Headers: m.Headers, InsecureTLS: m.InsecureTLS, Assertions: m.Assert,
 	}
 	var problems []SpecProblem
 	if m.RequiresVPN != nil {

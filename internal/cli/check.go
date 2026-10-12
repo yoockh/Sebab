@@ -48,6 +48,36 @@ type monitorFlags struct {
 	paused                  bool
 	allowRedirect           string
 	jsonOut                 bool
+	asserts                 listFlag
+}
+
+// listFlag collects a repeatable string flag.
+type listFlag []string
+
+func (l *listFlag) String() string     { return strings.Join(*l, ", ") }
+func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
+
+// parseAssertion reads "body=TEXT", "json:PATH=VALUE", "header:NAME=VALUE";
+// a leading "!" negates, and json/header may omit "=VALUE" (must exist).
+func parseAssertion(s string) (config.Assertion, error) {
+	var a config.Assertion
+	if strings.HasPrefix(s, "!") {
+		a.Negate, s = true, s[1:]
+	}
+	kind, rest, _ := strings.Cut(s, ":")
+	switch {
+	case strings.HasPrefix(s, "body="):
+		a.Type, a.Value = "body", strings.TrimPrefix(s, "body=")
+	case kind == "json":
+		a.Type = "json"
+		a.Path, a.Value, _ = strings.Cut(rest, "=")
+	case kind == "header":
+		a.Type = "header"
+		a.Name, a.Value, _ = strings.Cut(rest, "=")
+	default:
+		return a, fmt.Errorf("--assert %q: use body=TEXT, json:PATH=VALUE or header:NAME=VALUE", s)
+	}
+	return a, nil
 }
 
 func (f *monitorFlags) register(fs flagSet, forCheck bool) {
@@ -76,6 +106,7 @@ func (f *monitorFlags) register(fs flagSet, forCheck bool) {
 	fs.BoolVar(&f.noFollow, "no-follow", false, "do not follow redirects")
 	fs.StringVar(&f.allowRedirect, "allow-redirect", "", "extra hosts redirects may go to, comma separated")
 	fs.BoolVar(&f.jsonOut, "json", false, "print JSON")
+	fs.Var(&f.asserts, "assert", "response assertion, repeatable: body=TEXT, json:PATH=VALUE, header:NAME=VALUE; prefix ! to negate")
 }
 
 // normalizeTarget turns user input into a URL or a tcp:// target.
@@ -184,6 +215,19 @@ func (f *monitorFlags) applyFlags(m *config.Monitor, set map[string]bool) error 
 	}
 	if set["allow-redirect"] {
 		m.AllowedRedirectHosts = splitList(f.allowRedirect)
+	}
+	if set["assert"] {
+		m.Assert = nil
+		for _, raw := range f.asserts {
+			if raw == "" || raw == "none" {
+				continue // --assert none clears them
+			}
+			a, err := parseAssertion(raw)
+			if err != nil {
+				return err
+			}
+			m.Assert = append(m.Assert, a)
+		}
 	}
 	if set["auth"] {
 		if f.authType == "" || f.authType == "none" {

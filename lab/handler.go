@@ -21,6 +21,8 @@ import (
 //	/away               redirects to elsewhere.lab.test (unexpected host)
 //	/redirect           redirects to /ok on the same host
 //	/closed             closes the connection without a response
+//	/json               {"status":"ok","items":[{"name":"a","state":"ready"}]}
+//	/portal             200 with a login page (captive portal look-alike)
 //	/auth/bearer        200 with "Authorization: Bearer <Token>", else 401
 //	/auth/header        200 with "X-API-Key: <Token>", else 401
 //	/auth/basic         200 with basic auth lab:<Token>, else 401
@@ -63,6 +65,14 @@ func Handler() http.Handler {
 	})
 	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ok", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"status":"ok","items":[{"name":"a","state":"ready"}]}`)
+	})
+	mux.HandleFunc("/portal", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintln(w, "<html><body>Please sign in to the hotel Wi-Fi</body></html>")
 	})
 	mux.HandleFunc("/closed", func(w http.ResponseWriter, _ *http.Request) {
 		hj, ok := w.(http.Hijacker)
