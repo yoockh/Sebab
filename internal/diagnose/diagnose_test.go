@@ -166,3 +166,9 @@ func TestHumanAndAgo(t *testing.T) {
 		}
 	}
 }
+
+func TestHumanRoundsToTenths(t *testing.T) {
+	if got := human(5000300 * time.Microsecond); got != "5 s" {
+		t.Errorf("got %q", got)
+	}
+}

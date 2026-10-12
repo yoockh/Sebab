@@ -297,7 +297,7 @@ func human(d time.Duration) string {
 	case d < time.Second:
 		return fmt.Sprintf("%d ms", d.Milliseconds())
 	case d < time.Minute:
-		s := d.Seconds()
+		s := math.Round(d.Seconds()*10) / 10
 		if s == math.Trunc(s) {
 			return fmt.Sprintf("%d s", int(s))
 		}

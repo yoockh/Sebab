@@ -391,3 +391,12 @@ func TestLabInjectedClockExpiresCert(t *testing.T) {
 	_, d := e.check(t, httpSpec(t, l.TLSURL(lab.TLSValid, "app.lab.test", "/ok"), l))
 	expect(t, d, want{diagnose.TLSExpired, event.LayerTLS, event.SideTheirs, event.StatusDown})
 }
+
+func TestLabHandshakeDetailIsShort(t *testing.T) {
+	l := startLab(t)
+	e := newEnv(t, l, platform.Online())
+	_, d := e.check(t, httpSpec(t, fmt.Sprintf("https://app.lab.test:%d/", l.HandshakePort), l))
+	if strings.Contains(d.Summary, "Get \"") || strings.Contains(d.Summary, "https://") {
+		t.Errorf("summary should not carry Go's request wrapper: %q", d.Summary)
+	}
+}

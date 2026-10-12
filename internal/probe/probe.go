@@ -348,6 +348,10 @@ func classifyDial(err error) (diagnose.Code, string) {
 
 // shortErr strips address noise from low-level errors ("dial tcp 1.2.3.4:5: x" -> "x").
 func shortErr(err error) string {
+	var ue *url.Error
+	if errors.As(err, &ue) && ue.Err != nil {
+		err = ue.Err
+	}
 	var oe *net.OpError
 	if errors.As(err, &oe) && oe.Err != nil {
 		return oe.Err.Error()
