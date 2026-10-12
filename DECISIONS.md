@@ -203,3 +203,21 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   over `noctalia msg plugin yoockh/sebab:panel all <event>`, driving exactly the same code as the buttons.
 - **Why:** lets a keybind open "add this URL", and lets the real-shell verification reach the result and error
   states: no Wayland input injection tool (wtype, ydotool) is installed and installing one needs root.
+
+## D25. claude-cockpit used for layout ideas only
+
+- **What:** before looking at `nightwatch75/claude-cockpit` (community-plugins) its license was checked:
+  `license = "MIT"` in `plugin.toml` and an MIT `LICENSE` file (Copyright (c) 2026 nightwatch75). Only its
+  screenshots and the shape of its layout (icon header, pill tab row, rounded cards with a headline value,
+  progress bars, keyed `align = "stretch"` scrolls) were studied. No code was copied.
+
+## D26. Panel frame: pinned header and footer, one growing scroll, no spacers
+
+- **What:** every panel view uses one frame: header row (title, actions, close) pinned at the top, a single
+  `ui.scroll` with `flexGrow = 1` holding the content, then pinned parts (result card, action buttons, status line)
+  at the bottom. The panel is 520x720 (was 480x640) on a 1920x1080 screen.
+- **Why:** the form's scroll was cut short with dead space under the buttons. Cause, verified in the real shell:
+  `ui.spacer` is a flexible filler, and the empty placeholders (`ui.spacer({ height = 0 })` for "no status line"
+  and "no test result") took a share of the free height away from the scroll. Placeholders are now omitted
+  instead; `panel_layout_test.luau` asserts no spacer exists and only the scroll grows. Noctalia reads the panel
+  size from the manifest when the plugin is (re)enabled, not on `config-reload`.

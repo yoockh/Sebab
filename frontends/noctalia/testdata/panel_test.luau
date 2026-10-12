@@ -69,7 +69,7 @@ onOpen(nil)
 local text = H.text(H.rendered)
 H.contains(text, "Payments API", "row name")
 H.contains(text, "status.down", "status pill")
-H.contains(text, "51 ms", "latency")
+H.contains(text, "95 ms", "latency of a healthy monitor")
 H.contains(text, "time.seconds_ago|n=10", "last check")
 H.assert(#H.find(H.rendered, function(n) return n.type == "glyph" and n.props.name == "shield-off" end) == 1,
   "insecure monitor is marked")

@@ -492,16 +492,20 @@ local function monitorRow(m)
   local nowS = noctalia.nowMs() / 1000
   local open = expanded[m.id] == true
   local id = m.id
+  -- No ui.spacer placeholders: a spacer grows and steals space (D26).
+  local cells = { pill(m.status), ui.label({ text = m.name or m.id, flexGrow = 1, maxLines = 1 }) }
+  if m.insecure then
+    table.insert(cells, ui.glyph({ name = "shield-off", size = 14, color = "error" }))
+  end
+  if m.muted then
+    table.insert(cells, ui.glyph({ name = "bell-off", size = 14, color = "on_surface_variant" }))
+  end
+  local showLatency = type(latency) == "number" and m.status ~= "down"
+  table.insert(cells, muted(showLatency and `{math.floor(latency)} ms` or "-"))
+  table.insert(cells, muted(m.checkedAt and common.ago(nowS - m.checkedAt) or tr("time.never"), { width = 72, textAlign = "end" }))
+  table.insert(cells, ui.glyph({ name = open and "chevron-down" or "chevron-right", size = 14, color = "on_surface_variant" }))
   local header = ui.row({ key = "row-" .. m.id, gap = 8, align = "center", paddingV = 4,
-    onClick = function() expanded[id] = not expanded[id]; render() end }, {
-    pill(m.status),
-    ui.label({ text = m.name or m.id, flexGrow = 1, maxLines = 1 }),
-    m.insecure and ui.glyph({ name = "shield-off", size = 14, color = "error" }) or ui.spacer({ width = 0 }),
-    m.muted and ui.glyph({ name = "bell-off", size = 14, color = "on_surface_variant" }) or ui.spacer({ width = 0 }),
-    muted(type(latency) == "number" and `{math.floor(latency)} ms` or "-"),
-    muted(m.checkedAt and common.ago(nowS - m.checkedAt) or tr("time.never"), { width = 72, textAlign = "end" }),
-    ui.glyph({ name = open and "chevron-down" or "chevron-right", size = 14, color = "on_surface_variant" }),
-  })
+    onClick = function() expanded[id] = not expanded[id]; render() end }, cells)
   if not open then
     return header
   end
@@ -542,47 +546,57 @@ local function header(title, extra)
   return ui.row({ gap = 6, align = "center" }, items)
 end
 
-local function footer()
+-- statusLine is the transient busy/toast line, or nil.
+local function statusLine()
   local text = busy or toast
   if text == nil then
-    return ui.spacer({ height = 0 })
+    return nil
   end
-  return muted(text, { maxLines = 3, color = busy and "on_surface_variant" or "primary" })
+  return muted(text, { key = "status-line", maxLines = 3, color = busy and "on_surface_variant" or "primary" })
+end
+
+-- frame is the shared panel layout (D26): the header pinned at the top, the
+-- body scrolling in all the remaining height, and the pinned parts (cards,
+-- action buttons, status line) at the bottom. nil entries are skipped.
+local function frame(headerNode, scrollKey, body, pinned)
+  local children = { headerNode, ui.scroll({ key = scrollKey, flexGrow = 1, gap = 10, align = "stretch" }, body) }
+  for i = 1, pinned.n or #pinned do
+    if pinned[i] ~= nil then
+      table.insert(children, pinned[i])
+    end
+  end
+  return ui.column({ key = "frame-" .. scrollKey, flexGrow = 1, gap = 10 }, children)
 end
 
 local function listView()
   local s = snapshot
-  local children = {
-    header(tr("panel.title"), {
-      ui.button({ glyph = "refresh", variant = "ghost", tooltip = tr("panel.check_all"),
-        onClick = function() simple({ "refresh" }, tr("panel.busy_refresh"), tr("panel.refresh_sent")) end }),
-      ui.button({ glyph = "plus", variant = "primary", tooltip = tr("panel.add"), onClick = openAdd }),
-    }),
-    muted(summaryText(s)),
-  }
+  local body = { muted(summaryText(s)) }
   if s == nil or s.engine == "missing" then
-    table.insert(children, banner("alert-triangle", "tertiary", tr("panel.missing_binary"),
+    table.insert(body, banner("alert-triangle", "tertiary", tr("panel.missing_binary"),
       ui.button({ text = tr("panel.settings"), controlSize = "sm", onClick = function() noctalia.openSettings() end })))
   elseif s.engine == "stalled" then
-    table.insert(children, banner("plug-connected-x", "error", tr("panel.stalled"),
+    table.insert(body, banner("plug-connected-x", "error", tr("panel.stalled"),
       ui.button({ text = tr("panel.restart"), controlSize = "sm",
         onClick = function() noctalia.state.set("sebab.cmd", { cmd = "restart", at = noctalia.nowMs() }) end })))
   elseif s.offline then
-    table.insert(children, banner("wifi-off", "error", tr("panel.offline", { cause = s.offlineCause or "" })))
+    table.insert(body, banner("wifi-off", "error", tr("panel.offline", { cause = s.offlineCause or "" })))
   end
   if s ~= nil and s.lastError ~= nil and s.lastError.code ~= "SECRET_MISSING" then
-    table.insert(children, banner("alert-circle", "error", s.lastError.message or s.lastError.code))
+    table.insert(body, banner("alert-circle", "error", s.lastError.message or s.lastError.code))
   end
-  local rows = {}
+  local rows = 0
   for _, m in ipairs(s and s.monitors or {}) do
-    table.insert(rows, monitorRow(m))
+    table.insert(body, monitorRow(m))
+    rows += 1
   end
-  if #rows == 0 and s ~= nil and s.engine ~= "missing" then
-    table.insert(rows, muted(tr("panel.empty"), { maxLines = 3 }))
+  if rows == 0 and s ~= nil and s.engine ~= "missing" then
+    table.insert(body, muted(tr("panel.empty"), { maxLines = 3 }))
   end
-  table.insert(children, ui.scroll({ flexGrow = 1, gap = 4 }, rows))
-  table.insert(children, footer())
-  return ui.column({ flexGrow = 1, gap = 10 }, children)
+  return frame(header(tr("panel.title"), {
+    ui.button({ glyph = "refresh", variant = "ghost", tooltip = tr("panel.check_all"),
+      onClick = function() simple({ "refresh" }, tr("panel.busy_refresh"), tr("panel.refresh_sent")) end }),
+    ui.button({ glyph = "plus", variant = "primary", tooltip = tr("panel.add"), onClick = openAdd }),
+  }), "list-scroll", body, { statusLine(), n = 1 })
 end
 
 local function field(label, control)
@@ -599,7 +613,7 @@ end
 
 local function testView()
   if testResult == nil then
-    return ui.spacer({ height = 0 })
+    return nil
   end
   local ev = testResult
   local status = ev.status or "unknown"
@@ -652,25 +666,27 @@ local function formView()
     ui.toggle({ checked = f.insecure, onChange = function(v) f.insecure = v == "true"; testResult = nil; render() end }),
     ui.label({ text = tr("form.insecure"), flexGrow = 1, maxLines = 2, color = f.insecure and "error" or "on_surface" }),
   }))
-  -- Feedback lives outside the scroll so it is always visible (item 7).
+  -- Feedback lives outside the scroll so it is always visible (D23).
   local feedback = {}
   for _, e in ipairs(formErrors) do
     table.insert(feedback, ui.label({ text = e, color = "error", fontSize = 12, maxLines = 4 }))
   end
-  table.insert(feedback, testView())
+  local card = testView()
+  if card ~= nil then
+    table.insert(feedback, card)
+  end
   local title = f.mode == "add" and tr("form.add_title") or tr("form.edit_title", { name = f.name })
-  return ui.column({ flexGrow = 1, gap = 10 }, {
-    header(title),
-    ui.scroll({ flexGrow = 1, gap = 10 }, fields),
-    ui.column({ gap = 4 }, feedback),
-    ui.row({ gap = 8, justify = "end" }, {
-      ui.button({ text = tr("form.cancel"), variant = "ghost", onClick = cancelForm }),
-      ui.button({ text = tr("form.test"), glyph = "flask", variant = "secondary", enabled = busy == nil, onClick = runTest }),
-      ui.button({ text = testResult and tr("form.save") or tr("form.test_and_save"), glyph = "device-floppy",
-        variant = "primary", enabled = busy == nil, onClick = save }),
-    }),
-    footer(),
+  local buttons = ui.row({ key = "form-actions", gap = 8, justify = "end" }, {
+    ui.button({ text = tr("form.cancel"), variant = "ghost", onClick = cancelForm }),
+    ui.button({ text = tr("form.test"), glyph = "flask", variant = "secondary", enabled = busy == nil, onClick = runTest }),
+    ui.button({ text = testResult and tr("form.save") or tr("form.test_and_save"), glyph = "device-floppy",
+      variant = "primary", enabled = busy == nil, onClick = save }),
   })
+  local pinnedFeedback = nil
+  if #feedback > 0 then
+    pinnedFeedback = ui.column({ key = "form-feedback", gap = 4 }, feedback)
+  end
+  return frame(header(title), "form-scroll", fields, { pinnedFeedback, buttons, statusLine(), n = 3 })
 end
 
 local function confirmView()
