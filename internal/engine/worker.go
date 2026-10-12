@@ -77,7 +77,7 @@ func (e *Engine) runWorker(ctx context.Context, w *worker, firstDelay time.Durat
 			timer.Reset(interval)
 			continue
 		}
-		if e.isOffline() {
+		if e.isOffline() || e.paused() {
 			expected = interval
 			timer.Reset(interval)
 			continue

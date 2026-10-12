@@ -44,6 +44,7 @@ type Options struct {
 	OfflineRecheck time.Duration // default 30s
 	JitterMax      time.Duration // default 10s; 0 in tests via NoJitter
 	NoJitter       bool
+	ResumeGrace    time.Duration // wait after resume before checking; default 15s
 }
 
 // Engine is the scheduler and state machine. Create with New, start with Run.
@@ -63,7 +64,10 @@ type Engine struct {
 	triggerCh chan string
 	queryCh   chan func()
 	recheckCh chan recheck
+	sleepCh   chan bool
 	offline   atomic.Bool
+	sleeping  atomic.Bool
+	graceTill atomic.Int64 // unix nanos; checks are skipped until then after a resume
 	started   chan struct{}
 	startOnce sync.Once
 
@@ -81,6 +85,8 @@ type Engine struct {
 	runCtx      context.Context
 	offTimer    Timer
 	rechecking  bool
+	wakeTimer   Timer
+	resumeGrace time.Duration
 }
 
 type recheck struct {
@@ -105,18 +111,36 @@ func New(cfg *config.Config, opts Options) *Engine {
 	if opts.Sink == nil {
 		opts.Sink = SinkFunc(func(any) {})
 	}
+	if opts.ResumeGrace <= 0 {
+		opts.ResumeGrace = 15 * time.Second
+	}
 	return &Engine{
 		clock: opts.Clock, checker: opts.Checker, canary: opts.Canary, network: opts.Network,
 		sink: opts.Sink, version: opts.Version, source: opts.Source,
 		offlineRecheck: opts.OfflineRecheck, jitterMax: opts.JitterMax,
 		obsCh: make(chan observation), reloadCh: make(chan *config.Config, 1),
 		triggerCh: make(chan string, 64), queryCh: make(chan func()), recheckCh: make(chan recheck, 1),
-		started: make(chan struct{}),
-		cfg:     cfg, mons: map[string]*monState{}, workers: map[string]*worker{}, vpnDown: map[string]bool{},
+		sleepCh: make(chan bool, 4), started: make(chan struct{}), resumeGrace: opts.ResumeGrace,
+		cfg: cfg, mons: map[string]*monState{}, workers: map[string]*worker{}, vpnDown: map[string]bool{},
 	}
 }
 
 func (e *Engine) isOffline() bool { return e.offline.Load() }
+
+// paused reports whether workers must skip checks right now (asleep, or in the
+// grace period after a resume).
+func (e *Engine) paused() bool {
+	return e.sleeping.Load() || e.clock.Now().UnixNano() < e.graceTill.Load()
+}
+
+// SetSleeping is called from a logind PrepareForSleep watcher: true before the
+// system suspends, false after it resumes.
+func (e *Engine) SetSleeping(sleeping bool) {
+	select {
+	case e.sleepCh <- sleeping:
+	default:
+	}
+}
 
 // Started is closed once Run has emitted the initial events.
 func (e *Engine) Started() <-chan struct{} { return e.started }
@@ -131,9 +155,12 @@ func (e *Engine) Run(ctx context.Context) error {
 	defer hb.Stop()
 	defer e.stopAll()
 	for {
-		var offC <-chan time.Time
+		var offC, wakeC <-chan time.Time
 		if e.offTimer != nil {
 			offC = e.offTimer.C()
+		}
+		if e.wakeTimer != nil {
+			wakeC = e.wakeTimer.C()
 		}
 		select {
 		case <-ctx.Done():
@@ -154,6 +181,11 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.startRecheck()
 		case r := <-e.recheckCh:
 			e.onRecheck(r)
+		case s := <-e.sleepCh:
+			e.onSleep(s)
+		case <-wakeC:
+			e.wakeTimer = nil
+			e.trigger("")
 		}
 	}
 }
@@ -471,6 +503,30 @@ func (e *Engine) enterOffline(d diagnose.Diagnosis) {
 	}
 	e.emitSummary(false)
 	e.scheduleRecheck()
+}
+
+// onSleep pauses checks before suspend and, after resume, waits resumeGrace for
+// the network to come back before checking everything once.
+func (e *Engine) onSleep(sleeping bool) {
+	now := e.clock.Now()
+	if sleeping {
+		e.sleeping.Store(true)
+		e.sink.Emit(event.NewNotice(now, event.NoticeResumed, "system is suspending: checks paused"))
+		return
+	}
+	if !e.sleeping.Swap(false) {
+		return
+	}
+	e.graceTill.Store(now.Add(e.resumeGrace).UnixNano())
+	if e.canary != nil {
+		e.canary.Invalidate()
+	}
+	e.sink.Emit(event.NewNotice(now, event.NoticeResumed,
+		fmt.Sprintf("system resumed: checks continue in %s", e.resumeGrace)))
+	if e.wakeTimer != nil {
+		e.wakeTimer.Stop()
+	}
+	e.wakeTimer = e.clock.NewTimer(e.resumeGrace)
 }
 
 func (e *Engine) scheduleRecheck() {

@@ -592,3 +592,43 @@ func TestCanaryDisabledReportsUnknownSide(t *testing.T) {
 }
 
 func durPtr(d time.Duration) *config.Duration { v := config.Duration(d); return &v }
+
+func TestLogindSleepPausesAndGraceDelaysChecks(t *testing.T) {
+	h := start(t, monitor("api"))
+	h.script.set("api", "")
+	h.settle(2)
+	h.tick(0, 2)
+	h.waitChecks("api", 1)
+	h.eng.SetSleeping(true)
+	h.eng.query(context.Background(), func() {})
+	h.tick(interval, 2)
+	if got := h.script.count("api"); got != 1 {
+		t.Fatalf("no checks while sleeping, calls=%d", got)
+	}
+	h.eng.SetSleeping(false)
+	h.eng.query(context.Background(), func() {})
+	h.tick(5*time.Second, 3) // inside the 15s grace: worker, heartbeat, wake timer
+	if got := h.script.count("api"); got != 1 {
+		t.Fatalf("no checks during the resume grace, calls=%d", got)
+	}
+	h.clock.Advance(10 * time.Second) // grace ends: wake timer triggers every monitor
+	deadline := time.Now().Add(3 * time.Second)
+	for h.script.count("api") < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("checks should resume after the grace period")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	var resumed int
+	for _, n := range h.rec.notices(event.NoticeResumed) {
+		if strings.Contains(n.Message, "resumed") || strings.Contains(n.Message, "suspending") {
+			resumed++
+		}
+	}
+	if resumed != 2 {
+		t.Errorf("want suspend + resume notices, got %d", resumed)
+	}
+	for _, n := range h.rec.notifications() {
+		t.Errorf("sleep handling must not notify: %+v", n)
+	}
+}
