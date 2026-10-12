@@ -36,6 +36,42 @@ archives:
       - frontends/waybar/*
       - packaging/systemd/*
 
+# .deb and .rpm (mirrors packaging/nfpm/nfpm.yaml).
+nfpms:
+  - id: packages
+    ids: [sebab]
+    package_name: sebab
+    file_name_template: "{{ .ConventionalFileName }}"
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    section: net
+    priority: optional
+    maintainer: yoockh <yoockh@users.noreply.github.com>
+    description: |-
+      Endpoint monitor that names the failing layer and whose side the fault is on.
+    vendor: yoockh
+    homepage: https://github.com/yoockh/sebab
+    license: MIT
+    recommends: [gnome-keyring]
+    suggests: [waybar]
+    contents:
+      - src: packaging/systemd/sebab.service
+        dst: /usr/lib/systemd/user/sebab.service
+        file_info:
+          mode: 0644
+      - src: README.md
+        dst: /usr/share/doc/sebab/README.md
+        type: doc
+      - src: LICENSE
+        dst: /usr/share/licenses/sebab/LICENSE
+        type: license
+      - src: frontends/waybar/config.jsonc
+        dst: /usr/share/doc/sebab/waybar/config.jsonc
+        type: doc
+      - src: frontends/waybar/style.css
+        dst: /usr/share/doc/sebab/waybar/style.css
+        type: doc
+
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256

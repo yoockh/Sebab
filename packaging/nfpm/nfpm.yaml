@@ -1,0 +1,47 @@
+# nfpm configuration for .deb and .rpm (build only; nothing is published).
+#
+#   make build
+#   VERSION=0.1.0 ARCH=amd64 nfpm pkg --config packaging/nfpm/nfpm.yaml --packager deb --target dist/
+#   VERSION=0.1.0 ARCH=amd64 nfpm pkg --config packaging/nfpm/nfpm.yaml --packager rpm --target dist/
+#
+# GoReleaser builds the same packages from .goreleaser.yaml (nfpms section).
+name: sebab
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: net
+priority: optional
+maintainer: yoockh <yoockh@users.noreply.github.com>
+description: |-
+  Endpoint monitor that names the failing layer and whose side the fault is on.
+  Sebab probes HTTP(S) and TCP endpoints layer by layer (local network, VPN,
+  DNS, TCP, TLS, HTTP) and reports the cause to Noctalia, Waybar or the CLI.
+vendor: yoockh
+homepage: https://github.com/yoockh/sebab
+license: MIT
+recommends:
+  - gnome-keyring
+suggests:
+  - waybar
+contents:
+  - src: ./bin/sebab
+    dst: /usr/bin/sebab
+    file_info:
+      mode: 0755
+  - src: ./packaging/systemd/sebab.service
+    dst: /usr/lib/systemd/user/sebab.service
+    file_info:
+      mode: 0644
+  - src: ./README.md
+    dst: /usr/share/doc/sebab/README.md
+    type: doc
+  - src: ./LICENSE
+    dst: /usr/share/licenses/sebab/LICENSE
+    type: license
+  - src: ./frontends/waybar/config.jsonc
+    dst: /usr/share/doc/sebab/waybar/config.jsonc
+    type: doc
+  - src: ./frontends/waybar/style.css
+    dst: /usr/share/doc/sebab/waybar/style.css
+    type: doc
