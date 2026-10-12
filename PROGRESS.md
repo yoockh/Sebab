@@ -120,17 +120,21 @@ Story 12: Install and setup (Must)
 
 | Item | Status | Commit |
 |---|---|---|
-| History + sparklines | todo | |
-| Incident report export | todo | |
-| Assertions (JSON path, body keyword, header) | todo | |
-| Quiet hours, per-monitor mute | todo | |
-| Webhook / ntfy / Telegram | todo | |
+| History + sparklines | done (JSONL, D22) | 012909b |
+| Incident report export | done (`sebab report` adds the 24 h timeline) | 012909b |
+| Assertions (JSON path, body keyword, header) | done (`HTTP_ASSERTION_FAILED`) | 3a9b6cb |
+| Quiet hours, per-monitor mute | done | c9541e0 |
+| Webhook / ntfy / Telegram | done (`sebab notify-test`) | ae29cab |
+| Opt-in Globalping "down for everyone" check | not done: not in the requested Phase 3 list, contacts a third party | |
+| Phase 4: TUI (`sebab tui`) | todo | |
+| Phase 4: GNOME / KDE frontends | not planned here (PRD: author or contributors) | |
 
 ## Needs human
 
 - Phase 0 exit visual check: place the widget on a bar (Settings → Bar → add "Sebab"), then confirm it renders.
   Not done automatically because it edits the personal bar layout in `~/.local/state/noctalia/settings.toml`.
 - Phase 1 exit: 30 days of dogfooding with >= 90% diagnosis accuracy.
+- Phase 3 exit: file a real bug report with an exported incident report.
 - Phase 2 exit: catalog submission to noctalia-dev/community-plugins; "same engine drives Noctalia and Waybar at
   the same time" on the real desktop (covered by tests: two frontends attached to one engine).
 - Plugin `thumbnail.webp` (960x540) must be generated with the Noctalia thumbnail generator from a real screenshot
@@ -143,4 +147,4 @@ Story 12: Install and setup (Must)
 
 ## Next up
 
-Phase 3: history and sparklines.
+Phase 4: `sebab tui`. Handoff docs (TESTING.md, README.md, docs/) are written and current.
