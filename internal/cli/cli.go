@@ -28,6 +28,7 @@ type Env struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	Getenv func(string) string
+	hooks  *hooks // tests only
 }
 
 // OSEnv returns the real process environment.
@@ -42,8 +43,14 @@ type command struct {
 
 func commands() map[string]command {
 	return map[string]command{
-		"watch":   {"stream engine events as JSON lines", runWatch},
-		"version": {"print the version", runVersion},
+		"check":        {"check one URL or host:port now and explain any failure", runCheck},
+		"monitor":      {"add, list, show, edit, rm, pause or resume monitors", runMonitor},
+		"secret":       {"set, rm, list secrets (values only via stdin) or create a handoff file", runSecret},
+		"watch":        {"stream engine events as JSON lines (attaches to a running engine)", runWatch},
+		"refresh":      {"ask the running engine to check now (all monitors, or one id)", runRefresh},
+		"report":       {"print a redacted Markdown diagnosis for a monitor", runReport},
+		"kill-session": {"stop a 'sebab watch --session' process (used by frontends)", runKillSession},
+		"version":      {"print the version", runVersion},
 	}
 }
 
@@ -76,7 +83,7 @@ func usage(w io.Writer) {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		fmt.Fprintf(w, "  %-10s %s\n", name, cmds[name].summary)
+		fmt.Fprintf(w, "  %-13s %s\n", name, cmds[name].summary)
 	}
 	fmt.Fprintln(w, "\nRun 'sebab <command> -h' for command flags.")
 }
