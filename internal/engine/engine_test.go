@@ -632,3 +632,68 @@ func TestLogindSleepPausesAndGraceDelaysChecks(t *testing.T) {
 		t.Errorf("sleep handling must not notify: %+v", n)
 	}
 }
+
+type fakeHistory struct {
+	mu      sync.Mutex
+	records []event.Check
+}
+
+func (f *fakeHistory) Record(c event.Check) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.records = append(f.records, c)
+	return nil
+}
+
+func (f *fakeHistory) Recent(string) []int64 { return []int64{90, -1, 100} }
+
+func TestHistoryRecordsObservationsAndAddsRecent(t *testing.T) {
+	hist := &fakeHistory{}
+	cfg := &config.Config{Monitors: []config.Monitor{monitor("api")}}
+	rec := &recorder{}
+	sc := newScript()
+	sc.set("api", "", diagnose.TCPRefused)
+	clock := NewFakeClock(t0)
+	eng := New(cfg, Options{Clock: clock, Checker: sc, Sink: rec, NoJitter: true, History: hist,
+		Canary: &fakeCanary{ok: true}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = eng.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	<-eng.Started()
+	for clock.Pending() < 2 {
+		time.Sleep(time.Millisecond)
+	}
+	clock.Advance(0)
+	for len(rec.checks("api")) < 1 {
+		time.Sleep(time.Millisecond)
+	}
+	for clock.Pending() < 2 {
+		time.Sleep(time.Millisecond)
+	}
+	clock.Advance(60 * time.Second)
+	for len(rec.checks("api")) < 2 {
+		time.Sleep(time.Millisecond)
+	}
+	eng.query(context.Background(), func() {})
+	hist.mu.Lock()
+	n := len(hist.records)
+	hist.mu.Unlock()
+	if n != 2 {
+		t.Fatalf("want 2 recorded observations, got %d", n)
+	}
+	if c := rec.checks("api")[1]; len(c.RecentMS) != 3 || c.RecentMS[1] != -1 {
+		t.Errorf("recent_ms %v", c.RecentMS)
+	}
+	snap := eng.Snapshot(context.Background())
+	for _, ev := range snap {
+		if c, ok := ev.(event.Check); ok && len(c.RecentMS) != 3 {
+			t.Errorf("snapshot checks carry recent_ms: %v", c.RecentMS)
+		}
+	}
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	if len(hist.records) != 2 {
+		t.Errorf("a snapshot must not record history, got %d", len(hist.records))
+	}
+}

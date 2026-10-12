@@ -395,6 +395,12 @@ local function details(m)
   if t ~= "" then
     table.insert(rows, muted(tr("panel.timings", { timings = t })))
   end
+  local values, failures = common.sparkline(m.recent)
+  if values ~= nil then
+    table.insert(rows, muted(tr("panel.recent", { n = #values })))
+    table.insert(rows, ui.graph({ key = "spark-" .. m.id, values = values, values2 = failures, color = "primary",
+      color2 = "error", lineWidth = 1.5, fillOpacity = 0.15, height = 36 }))
+  end
   if m.since ~= nil and m.status ~= "up" then
     table.insert(rows, muted(tr("panel.since", { status = common.statusLabel(m.status), time = common.clock(m.since),
       ago = common.ago(nowS - m.since) })))

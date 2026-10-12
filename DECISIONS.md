@@ -161,3 +161,14 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   `../../../bin/sebab` relative to its own directory, which is `bin/sebab` in a checkout of this repository.
 - **Why:** lets the maintainer run the plugin from the repo (dev path source) without installing anything
   system-wide. In a catalog install the path does not exist and the widget shows the setup hint.
+
+## D22. History in daily JSONL files, not SQLite
+
+- **What:** checks are appended as compact JSON lines to `$XDG_STATE_HOME/sebab/history/checks-YYYY-MM-DD.jsonl`
+  (one file per UTC day, 0600, pruned after `[history] keep_days`, default 7) and status changes to
+  `incidents.jsonl` (kept 10x longer). The engine keeps the last 30 totals per monitor in memory, seeded from disk,
+  and sends them as `recent_ms` on check events for sparklines.
+- **Why:** the PRD suggests SQLite, but the only CGO-free driver (modernc.org/sqlite) roughly triples the static
+  binary and its build time for a dataset that is append-only, small (about 1.5 MB per day for 20 monitors at 60 s)
+  and only read sequentially. JSONL needs no dependency and stays greppable.
+- **Alternatives:** modernc.org/sqlite; mattn/go-sqlite3 (needs CGO, breaks the static binary); bbolt.

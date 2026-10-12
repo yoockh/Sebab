@@ -113,6 +113,19 @@ attached. See `packaging/systemd/sebab.service`.
 
 Prints one Waybar JSON object per state change. See `frontends/waybar`.
 
+## sebab history
+
+```sh
+sebab history payments-api            # last 24 h: availability, p50/p95, sparkline, status changes
+sebab history --since 168h            # all monitors, last week
+sebab history payments-api --json
+```
+
+History lives in `$XDG_STATE_HOME/sebab/history` (0600 files, pruned after
+`[history] keep_days`, default 7; disable with `[history] disabled = true`).
+`sebab report` appends the last 24 h of status changes and stats, which makes
+it an incident report you can paste into a bug ticket.
+
 ## sebab refresh / report / doctor
 
 ```sh

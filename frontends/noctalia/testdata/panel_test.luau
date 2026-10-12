@@ -59,7 +59,7 @@ noctalia.state.set("sebab", {
       side = "theirs", since = 1760187540, checkedAt = 1760187590, insecure = false,
       cause = { layer = "tls", code = "TLS_EXPIRED", summary = "TLS certificate expired 2 days ago",
         hint = "Renew the certificate on the server. DNS and TCP are fine." },
-      timings = { dns = 12, tcp = 38, total = 51 } },
+      timings = { dns = 12, tcp = 38, total = 51 }, recent = { 90, 120, -1, -1, 51 } },
     { id = "web", name = "Web", kind = "http", target = "https://www.example.com/", status = "up",
       checkedAt = 1760187595, timings = { dns = 3, tcp = 20, tls = 41, ttfb = 90, total = 95 }, insecure = true },
   },
@@ -83,6 +83,8 @@ H.contains(text, "panel.cause_line|", "cause line")
 H.contains(text, "side=side.theirs", "side")
 H.contains(text, "timings=DNS 12 ms, TCP 38 ms, TLS panel.failed", "timing breakdown")
 H.contains(text, "panel.since|", "down since")
+local graphs = H.find(H.rendered, function(n) return n.type == "graph" end)
+H.assert(#graphs == 1 and #graphs[1].props.values == 5 and graphs[1].props.values2[3] == 1, "latency sparkline with failures")
 
 -- Story 11: copy diagnosis through `sebab report`.
 clickText("panel.copy")

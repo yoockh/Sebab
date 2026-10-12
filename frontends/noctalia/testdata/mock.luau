@@ -213,8 +213,10 @@ local ALLOWED = {
     "frameVisible", "focus", "enabled", "onChange", "onSubmit" }),
   select = with({ "options", "selectedIndex", "placeholder", "controlSize", "enabled", "onChange" }),
   toggle = with({ "checked", "enabled", "onChange" }),
+  graph = with({ "values", "values2", "color", "color2", "lineWidth", "fillOpacity", "onPointerMove", "onPointerLeave" }),
 }
-local CALLBACKS = { onClick = 1, onHover = 1, onChange = 1, onSubmit = 1, onRightClick = 1, onScroll = 1 }
+local CALLBACKS = { onClick = 1, onHover = 1, onChange = 1, onSubmit = 1, onRightClick = 1, onScroll = 1,
+  onPointerMove = 1, onPointerLeave = 1 }
 local PARENTS = { column = true, row = true, scroll = true }
 local VARIANTS = { default = 1, primary = 1, secondary = 1, destructive = 1, outline = 1, ghost = 1 }
 
@@ -231,6 +233,15 @@ local function node(kind)
     end
     if kind == "button" and props.variant ~= nil and VARIANTS[props.variant] == nil then
       fail("bad button variant " .. tostring(props.variant))
+    end
+    if kind == "graph" then
+      for _, series in ipairs({ props.values or {}, props.values2 or {} }) do
+        for _, v in ipairs(series) do
+          if type(v) ~= "number" or v < 0 or v > 1 then
+            fail("ui.graph values must be numbers in 0..1")
+          end
+        end
+      end
     end
     if kind == "input" and props.password and props.multiline then
       fail("password and multiline are exclusive")

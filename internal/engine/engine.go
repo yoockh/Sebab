@@ -27,6 +27,12 @@ type SinkFunc func(ev any)
 // Emit implements Sink.
 func (f SinkFunc) Emit(ev any) { f(ev) }
 
+// History stores observations and serves recent latencies for sparklines.
+type History interface {
+	Record(c event.Check) error
+	Recent(id string) []int64
+}
+
 // CanaryConfigurer is implemented by canaries whose targets follow the config.
 type CanaryConfigurer interface {
 	Configure(targets, dnsNames []string)
@@ -45,6 +51,7 @@ type Options struct {
 	JitterMax      time.Duration // default 10s; 0 in tests via NoJitter
 	NoJitter       bool
 	ResumeGrace    time.Duration // wait after resume before checking; default 15s
+	History        History       // nil disables history
 }
 
 // Engine is the scheduler and state machine. Create with New, start with Run.
@@ -54,6 +61,7 @@ type Engine struct {
 	canary         Canary
 	network        platform.Network
 	sink           Sink
+	history        History
 	version        string
 	source         string
 	offlineRecheck time.Duration
@@ -116,7 +124,7 @@ func New(cfg *config.Config, opts Options) *Engine {
 	}
 	return &Engine{
 		clock: opts.Clock, checker: opts.Checker, canary: opts.Canary, network: opts.Network,
-		sink: opts.Sink, version: opts.Version, source: opts.Source,
+		sink: opts.Sink, history: opts.History, version: opts.Version, source: opts.Source,
 		offlineRecheck: opts.OfflineRecheck, jitterMax: opts.JitterMax,
 		obsCh: make(chan observation), reloadCh: make(chan *config.Config, 1),
 		triggerCh: make(chan string, 64), queryCh: make(chan func()), recheckCh: make(chan recheck, 1),
@@ -242,7 +250,11 @@ func (e *Engine) Snapshot(ctx context.Context) []any {
 			if m.checkedAt.IsZero() && m.display() != event.StatusPaused && e.offlineDiag == nil {
 				continue
 			}
-			out = append(out, m.checkEvent(now, e.offlineFor(m)))
+			ev := m.checkEvent(now, e.offlineFor(m))
+			if e.history != nil {
+				ev.RecentMS = e.history.Recent(id)
+			}
+			out = append(out, ev)
 		}
 		out = append(out, e.summary(now))
 	})
@@ -408,12 +420,24 @@ func (e *Engine) handle(obs observation) {
 		e.vpnCameBack(m)
 	}
 	t := m.apply(d, now)
-	e.emitCheck(m, t.notify)
+	e.emitCheckRec(m, t.notify, true)
 	e.emitSummary(false)
 }
 
 func (e *Engine) emitCheck(m *monState, n *event.Notification) {
+	e.emitCheckRec(m, n, false)
+}
+
+// emitCheckRec renders and emits a check event; record stores it in history
+// (only for real observations, not for re-renders after a reload or outage).
+func (e *Engine) emitCheckRec(m *monState, n *event.Notification, record bool) {
 	ev := m.checkEvent(e.clock.Now(), e.offlineFor(m))
+	if e.history != nil {
+		if record {
+			_ = e.history.Record(ev)
+		}
+		ev.RecentMS = e.history.Recent(m.info.ID)
+	}
 	last := ev
 	m.last = &last
 	if n != nil {
@@ -499,7 +523,7 @@ func (e *Engine) enterOffline(d diagnose.Diagnosis) {
 		Body: msg, Urgency: "critical"}
 	e.sink.Emit(notice)
 	for _, id := range e.order {
-		e.emitCheck(e.mons[id], nil)
+		e.emitCheckRec(e.mons[id], nil, true)
 	}
 	e.emitSummary(false)
 	e.scheduleRecheck()
@@ -630,7 +654,7 @@ func (e *Engine) vpnWentDown(m *monState, d diagnose.Diagnosis) {
 	m.observed, m.observedDiag = event.StatusPaused, d
 	if e.vpnDown[iface] {
 		m.vpnPaused = true
-		e.emitCheck(m, nil)
+		e.emitCheckRec(m, nil, true)
 		e.emitSummary(false)
 		return
 	}
@@ -657,7 +681,7 @@ func (e *Engine) vpnWentDown(m *monState, d diagnose.Diagnosis) {
 	e.sink.Emit(notice)
 	for _, id := range e.order {
 		if o := e.mons[id]; o.vpnPaused && ifaceOf(o) == iface {
-			e.emitCheck(o, nil)
+			e.emitCheckRec(o, nil, true)
 		}
 	}
 	e.emitSummary(false)

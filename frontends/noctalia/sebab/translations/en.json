@@ -79,7 +79,8 @@
     "busy_load": "Loading...",
     "busy_copy": "Preparing the diagnosis...",
     "busy_refresh": "Asking the engine...",
-    "busy_secret": "Preparing a secure handoff..."
+    "busy_secret": "Preparing a secure handoff...",
+    "recent": "Latency of the last {n} checks (red: failed)"
   },
   "form": {
     "add_title": "Add monitor",

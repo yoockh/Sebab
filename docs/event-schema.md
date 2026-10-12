@@ -50,6 +50,8 @@ The state of one monitor after a check.
 - `timings_ms`: a step that did not complete is `null`.
 - `details` (optional): `http_status`, `address`, `family`, `tls_not_after`, `retry_after_s`.
 - `monitor.insecure_tls`: true when TLS verification is disabled.
+- `recent_ms` (optional): the latest total check times in ms, oldest first; `-1` marks a failed check. Used for
+  sparklines; present when local history is enabled.
 - `notify`: the engine decided this event should produce a notification. Show
   `notification` and dedupe by `notification.id`.
 

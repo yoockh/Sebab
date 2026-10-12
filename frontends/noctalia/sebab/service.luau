@@ -151,6 +151,7 @@ local function applyCheck(ev)
   m.insecure = ev.monitor.insecure_tls == true or m.insecure
   m.httpStatus = ev.details and ev.details.http_status
   m.tlsNotAfter = ev.details and common.parseTime(ev.details.tls_not_after)
+  m.recent = ev.recent_ms -- latest totals in ms, -1 = failed (sparkline)
 end
 
 local function onLine(line: string)

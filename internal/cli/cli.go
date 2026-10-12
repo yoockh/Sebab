@@ -51,6 +51,7 @@ func commands() map[string]command {
 		"doctor":       {"explain what is missing (keyring, notifications, network, engine)", runDoctor},
 		"refresh":      {"ask the running engine to check now (all monitors, or one id)", runRefresh},
 		"report":       {"print a redacted Markdown diagnosis for a monitor", runReport},
+		"history":      {"show availability, latency and status changes from local history", runHistory},
 		"kill-session": {"stop a 'sebab watch --session' process (used by frontends)", runKillSession},
 		"waybar":       {"print Waybar custom-module JSON (return-type json)", runWaybar},
 		"version":      {"print the version", runVersion},

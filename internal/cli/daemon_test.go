@@ -164,3 +164,55 @@ func TestWatchFallsBackWhenDaemonStops(t *testing.T) {
 		t.Fatal("the embedded engine should now serve the socket")
 	}
 }
+
+func TestHistoryAndIncidentReport(t *testing.T) {
+	w := newWorld(t)
+	_ = os.MkdirAll(filepath.Dir(w.configPath()), 0o700)
+	cfg := &config.Config{Defaults: config.Defaults{FailThreshold: 1}}
+	_ = cfg.Save(w.configPath())
+	for _, args := range [][]string{
+		{"monitor", "add", "--name", "Web", "--target", w.url("/ok"), "--no-test"},
+		{"monitor", "add", "--name", "Gateway", "--target", w.url("/status/502"), "--no-test"},
+	} {
+		if code, _, e := w.run("", args...); code != 0 {
+			t.Fatal(e)
+		}
+	}
+	wt := w.startWatch("--embedded")
+	wt.waitFor(t, "gateway down", checkFor("gateway", "down"))
+	if code, _, e := w.run("", "refresh"); code != 0 {
+		t.Fatal(e)
+	}
+	ev := wt.waitFor(t, "second web check with recent_ms", func(ev map[string]any) bool {
+		r, _ := ev["recent_ms"].([]any)
+		return checkFor("web", "up")(ev) && len(r) >= 2
+	})
+	_ = ev
+	code, out, _ := w.run("", "history", "gateway")
+	if code != 0 || !strings.Contains(out, "0.00% available") || !strings.Contains(out, "start -> down") && !strings.Contains(out, "- -> down") {
+		t.Fatalf("history: %d\n%s", code, out)
+	}
+	code, out, _ = w.run("", "history", "web")
+	if code != 0 || !strings.Contains(out, "100.00% available") || !strings.Contains(out, "latency ") {
+		t.Fatalf("history web: %d\n%s", code, out)
+	}
+	code, md, _ := w.run("", "report", "gateway")
+	if code != 0 || !strings.Contains(md, "#### Last 24 h") || !strings.Contains(md, "-> down | HTTP_BAD_GATEWAY") {
+		t.Fatalf("incident report:\n%s", md)
+	}
+	wt.stop(t)
+	code, md, _ = w.run("", "report", "gateway", "--fresh")
+	if code != 0 || !strings.Contains(md, "#### Last 24 h") {
+		t.Fatalf("fresh incident report:\n%s", md)
+	}
+	w.assertNoLeak()
+}
+
+func TestSparkline(t *testing.T) {
+	if got := Sparkline([]int64{0, 50, 100, -1}, 10); got != "▁▄█x" {
+		t.Errorf("got %q", got)
+	}
+	if got := Sparkline([]int64{1, 2, 3}, 2); got != "▅█" {
+		t.Errorf("width: %q", got)
+	}
+}

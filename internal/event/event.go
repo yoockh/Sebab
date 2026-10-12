@@ -181,6 +181,7 @@ type Check struct {
 	Timings      Timings       `json:"timings_ms"`
 	Since        *Timestamp    `json:"since,omitempty"`
 	Details      *Details      `json:"details,omitempty"`
+	RecentMS     []int64       `json:"recent_ms,omitempty"` // latest totals, oldest first; -1 = failed
 	Notify       bool          `json:"notify"`
 	Notification *Notification `json:"notification,omitempty"`
 }

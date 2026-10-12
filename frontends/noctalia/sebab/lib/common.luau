@@ -124,4 +124,29 @@ function M.timings(t, failedLayer: string?): string
   return table.concat(parts, ", ")
 end
 
+-- Sparkline series for ui.graph: latencies scaled to 0..1, and a second series
+-- with spikes where a check failed (-1).
+function M.sparkline(recent)
+  local values, failures = {}, {}
+  if type(recent) ~= "table" or #recent < 2 then
+    return nil, nil
+  end
+  local hi = 1
+  for _, v in ipairs(recent) do
+    if type(v) == "number" and v > hi then
+      hi = v
+    end
+  end
+  for _, v in ipairs(recent) do
+    if type(v) ~= "number" or v < 0 then
+      table.insert(values, 0)
+      table.insert(failures, 1)
+    else
+      table.insert(values, v / hi)
+      table.insert(failures, 0)
+    end
+  end
+  return values, failures
+end
+
 return M

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yoockh/sebab/internal/event"
+	"github.com/yoockh/sebab/internal/history"
 	"github.com/yoockh/sebab/internal/secret"
 )
 
@@ -87,4 +88,41 @@ func Timings(t event.Timings, cause *event.Cause) string {
 
 func escape(s string) string {
 	return strings.NewReplacer("|", `\|`, "\n", " ").Replace(s)
+}
+
+// Timeline renders the incident timeline and stats of the last period from
+// history (an incident report for bug tickets). Empty when there is no data.
+func Timeline(h *history.Store, id string, period time.Duration, red *secret.Redactor) string {
+	from := time.Now().Add(-period)
+	samples, err := h.Samples(id, from, time.Now())
+	if err != nil || len(samples) == 0 {
+		return ""
+	}
+	trs, _ := h.Transitions(id, from)
+	st := history.Summarize(samples)
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n#### Last %s\n\n", humanPeriod(period))
+	fmt.Fprintf(&b, "- Checks: %d, available %.2f%%, latency p50 %d ms, p95 %d ms\n", st.Checks, 100*st.Availability, st.P50, st.P95)
+	if len(trs) > 0 {
+		b.WriteString("\n| Time (UTC) | Change | Cause |\n|---|---|---|\n")
+		for _, t := range trs {
+			from := string(t.From)
+			if from == "" {
+				from = "start"
+			}
+			cause := t.Code
+			if t.Summary != "" {
+				cause += ": " + t.Summary
+			}
+			fmt.Fprintf(&b, "| %s | %s -> %s | %s |\n", time.UnixMilli(t.Time).UTC().Format(stamp), from, t.To, escape(cause))
+		}
+	}
+	return red.Scrub(b.String())
+}
+
+func humanPeriod(d time.Duration) string {
+	if d%(24*time.Hour) == 0 {
+		return fmt.Sprintf("%d h", int(d.Hours()))
+	}
+	return d.String()
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/yoockh/sebab/internal/engine"
 	"github.com/yoockh/sebab/internal/event"
 	"github.com/yoockh/sebab/internal/filewatch"
+	"github.com/yoockh/sebab/internal/history"
 	"github.com/yoockh/sebab/internal/report"
 	"github.com/yoockh/sebab/internal/secret"
 	"github.com/yoockh/sebab/internal/server"
@@ -121,6 +122,10 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 		OnError: func(ev event.Error) { sinks.Emit(ev) }}
 	opts := engine.Options{Clock: rt.clock(), Checker: checker, Canary: rt.canary(cfg.EngineSettings()),
 		Network: rt.network, Sink: sinks, Version: versionString(), Source: source}
+	if h := openHistory(rt, cfg); h != nil {
+		defer h.Close()
+		opts.History = h
+	}
 	if rt.env.hooks != nil && !rt.env.hooks.jitter {
 		opts.NoJitter = true
 	}
@@ -143,7 +148,7 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 	defer cancel()
 	if sock != "" {
 		srv := &server.Server{Path: sock, Events: bc, Scrub: rt.redactor, Version: versionString(), Source: source,
-			Backend: &engineBackend{eng: eng, reload: reload, red: rt.redactor}}
+			Backend: &engineBackend{eng: eng, reload: reload, red: rt.redactor, hist: opts.History}}
 		if err := srv.Listen(); err == nil {
 			wg.Add(1)
 			go func() { defer wg.Done(); srv.Serve(ctx) }()
@@ -200,6 +205,7 @@ type engineBackend struct {
 	eng    *engine.Engine
 	reload func() error
 	red    *secret.Redactor
+	hist   engine.History
 }
 
 func (b *engineBackend) Snapshot(ctx context.Context) []any { return b.eng.Snapshot(ctx) }
@@ -211,7 +217,11 @@ func (b *engineBackend) Report(ctx context.Context, id string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no result for monitor %q yet", id)
 	}
-	return report.Markdown(ev, versionString(), b.red), nil
+	md := report.Markdown(ev, versionString(), b.red)
+	if h, ok := b.hist.(*history.Store); ok && h != nil {
+		md += report.Timeline(h, id, 24*time.Hour, b.red)
+	}
+	return md, nil
 }
 
 func sessionFile(rt *runtime, session string) string {

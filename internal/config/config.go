@@ -60,7 +60,14 @@ func (d Duration) D() time.Duration { return time.Duration(d) }
 // Config is the on-disk configuration.
 type Config struct {
 	Defaults Defaults  `toml:"defaults"`
+	History  History   `toml:"history,omitempty"`
 	Monitors []Monitor `toml:"monitor"`
+}
+
+// History configures the local check history (sparklines, incident reports).
+type History struct {
+	Disabled bool `toml:"disabled,omitempty"`
+	KeepDays int  `toml:"keep_days,omitempty"` // default 7
 }
 
 // Defaults are engine-wide settings and per-monitor fallbacks.
@@ -150,6 +157,9 @@ func (c *Config) Validate() error {
 	var probs []string
 	add := func(format string, a ...any) { probs = append(probs, fmt.Sprintf(format, a...)) }
 	probs = append(probs, c.Defaults.validate()...)
+	if c.History.KeepDays < 0 || c.History.KeepDays > 365 {
+		add("history: keep_days must be between 1 and 365")
+	}
 	if len(c.Monitors) > MaxMonitors {
 		add("too many monitors: %d (limit %d)", len(c.Monitors), MaxMonitors)
 	}

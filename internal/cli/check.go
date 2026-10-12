@@ -270,6 +270,12 @@ func runCheck(ctx context.Context, env Env, args []string) int {
 		}
 	case *markdown:
 		fmt.Fprint(env.Stdout, report.Markdown(ev, versionString(), rt.redactor))
+		if *monitorID != "" {
+			if h := openHistory(rt, cfg); h != nil {
+				fmt.Fprint(env.Stdout, report.Timeline(h, *monitorID, 24*time.Hour, rt.redactor))
+				h.Close()
+			}
+		}
 	default:
 		printHuman(env.Stdout, rt.redactor, settings, res, d, ev)
 	}
