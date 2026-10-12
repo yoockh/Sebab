@@ -303,3 +303,15 @@ chat_id = "42"
 		}
 	}
 }
+
+func TestValidationErrorsDoNotEchoCredentials(t *testing.T) {
+	for _, raw := range []string{"ftp://h.example/?api_key=leak-123", "https://user:leak-123@h.example/", "https://h.example:99999/?t=leak-123"} {
+		err := ValidateURL(raw)
+		if err == nil {
+			t.Fatalf("%s should be invalid", raw)
+		}
+		if strings.Contains(err.Error(), "leak-123") {
+			t.Errorf("error echoes a credential: %v", err)
+		}
+	}
+}

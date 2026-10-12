@@ -427,8 +427,9 @@ func (a *Auth) problems() []string {
 func ValidateURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("bad URL: %v", err)
+		return fmt.Errorf("bad URL %q", maskURL(raw))
 	}
+	raw = maskURL(raw)
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("bad URL %q: scheme must be http or https", raw)
 	}
@@ -447,6 +448,21 @@ func ValidateURL(raw string) error {
 		return fmt.Errorf("bad URL %q: put credentials in auth, not in the URL", raw)
 	}
 	return nil
+}
+
+// maskURL hides the query string and userinfo of a URL in error messages,
+// because either can carry a credential.
+func maskURL(raw string) string {
+	if i := strings.IndexByte(raw, '?'); i >= 0 {
+		raw = raw[:i] + "?[REDACTED]"
+	}
+	if i := strings.Index(raw, "://"); i >= 0 {
+		rest := raw[i+3:]
+		if at := strings.IndexByte(rest, '@'); at >= 0 && !strings.ContainsAny(rest[:at], "/?#") {
+			raw = raw[:i+3] + "[REDACTED]@" + rest[at+1:]
+		}
+	}
+	return raw
 }
 
 // ParseTCPTarget accepts "tcp://host:port" or "host:port" and returns host and port.
