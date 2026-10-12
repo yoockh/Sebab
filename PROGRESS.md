@@ -1,5 +1,16 @@
 # Sebab build progress
 
+## Summary (end of the autonomous build, 2026-10-12)
+
+Phases 0, 1 and 2 are done and green; the Phase 3 items you listed are done; Phase 4's TUI is done; from Phase 5,
+the secret-handling review (`docs/security.md`, which found and fixed URL credentials echoed in validation errors)
+and a reproducible-build check are done. `make check` (gofmt, vet, `go test -race ./...`) passes, the plugin
+scripts pass in a real Luau VM, `noctalia plugins lint` passes, and the community-plugins validator reports only the
+missing thumbnail. Nothing was pushed. Start with TESTING.md; what needs you is listed under "Needs human".
+
+Phase 5 status: event/config schema v1 is documented and versioned but not frozen (no migration needed yet);
+docs site, Indonesian translation (Noctalia Translate), signed releases and 1.0 need a human.
+
 This file is the resume point for any future session. Status values: `todo`, `wip`, `done`, `blocked`, `needs human`.
 A story's acceptance criteria are ticked only when a test or a verified manual run proves them (the proof is named).
 

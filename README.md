@@ -66,6 +66,7 @@ Frontends:
 - [`docs/cli.md`](docs/cli.md): every command, flags and exit codes
 - [`docs/config.md`](docs/config.md): `config.toml` reference
 - [`docs/event-schema.md`](docs/event-schema.md): event stream v1, cause codes, socket protocol
+- [`docs/security.md`](docs/security.md): secret handling review and threat model
 - [`TESTING.md`](TESTING.md): build, install, manual test checklist, failure lab
 - [`DECISIONS.md`](DECISIONS.md): design decisions and their reasons
 - [`PROGRESS.md`](PROGRESS.md): what is done, per PRD story
