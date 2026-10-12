@@ -23,6 +23,11 @@ local busy = nil
 local toast = nil
 local handoffPath = nil
 local confirmId = nil
+local highlightId, highlightUntil = nil, 0 -- row to highlight after a save (D28)
+local toastUntil = 0
+
+-- How long the "Saved" line and the row highlight stay (ms).
+local FLASH_MS = 5000
 
 local AUTH_TYPES = { "", "bearer", "header", "basic" }
 
@@ -341,6 +346,9 @@ local function save()
         handoffPath = nil -- consumed and deleted by the engine
       end
       toast = tr("panel.saved", { name = trim(form.name) }) .. "\n" .. tr("panel.saved_to", { path = configPathDisplay() })
+      toastUntil = noctalia.nowMs() + FLASH_MS
+      highlightId, highlightUntil = out.id or form.id, noctalia.nowMs() + FLASH_MS
+      panel.setWantsSecondTicks(true)
       if out.warning ~= nil then
         toast = toast .. "\n" .. out.warning
       end
@@ -504,8 +512,9 @@ local function monitorRow(m)
   table.insert(cells, muted(showLatency and `{math.floor(latency)} ms` or "-"))
   table.insert(cells, muted(m.checkedAt and common.ago(nowS - m.checkedAt) or tr("time.never"), { width = 72, textAlign = "end" }))
   table.insert(cells, ui.glyph({ name = open and "chevron-down" or "chevron-right", size = 14, color = "on_surface_variant" }))
-  local header = ui.row({ key = "row-" .. m.id, gap = 8, align = "center", paddingV = 4,
-    onClick = function() expanded[id] = not expanded[id]; render() end }, cells)
+  local flash = highlightId == m.id and noctalia.nowMs() < highlightUntil
+  local header = ui.row({ key = "row-" .. m.id, gap = 8, align = "center", paddingV = 4, paddingH = 4, radius = 6,
+    fill = flash and "primary/0.18" or "surface/0", onClick = function() expanded[id] = not expanded[id]; render() end }, cells)
   if not open then
     return header
   end
@@ -823,6 +832,24 @@ function onIpc(event, payload)
     save()
   elseif event == "cancel" or event == "list" then
     cancelForm()
+  end
+end
+
+-- update runs every second while a "Saved" line or row highlight is showing.
+function update()
+  local now = noctalia.nowMs()
+  local changed = false
+  if toast ~= nil and toastUntil > 0 and now >= toastUntil then
+    toast, toastUntil, changed = nil, 0, true
+  end
+  if highlightId ~= nil and now >= highlightUntil then
+    highlightId, changed = nil, true
+  end
+  if toastUntil == 0 and highlightId == nil then
+    panel.setWantsSecondTicks(false)
+  end
+  if changed then
+    render()
   end
 end
 

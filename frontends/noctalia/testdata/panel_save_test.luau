@@ -85,6 +85,24 @@ noctalia.state.set("sebab", { engine = "running", binary = "sebab",
   monitors = { { id = "example", name = "Example", kind = "http", target = "https://example.com/health", status = "down" } } })
 H.contains(H.text(H.rendered), "Example", "new monitor listed from engine state")
 
+-- D28: the new row is highlighted briefly, then the highlight and the "Saved" line go away.
+local row = H.find(H.rendered, function(n) return n.props.key == "row-example" end)[1]
+H.assert(row.props.fill == "primary/0.18", "new row highlighted")
+H.assert(H.secondTicks == true, "ticks requested while flashing")
+H.nowMs += 6000
+update()
+row = H.find(H.rendered, function(n) return n.props.key == "row-example" end)[1]
+H.assert(row.props.fill ~= "primary/0.18", "highlight cleared")
+H.assert(string.find(H.text(H.rendered), "panel.saved_to", 1, true) == nil, "saved line cleared")
+H.assert(H.secondTicks == false, "ticks stop when nothing flashes")
+
+-- Cancel discards the draft and returns to the list.
+onIpc("add", "https://draft.example/")
+onIpc("cancel", nil)
+onIpc("add", nil)
+H.assert(inputNamed("target").props.value == "", "cancelled draft is gone")
+onIpc("cancel", nil)
+
 print("panel save ok")
 
 -- IPC drives the same path as the buttons.

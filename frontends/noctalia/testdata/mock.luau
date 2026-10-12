@@ -276,6 +276,9 @@ panel = {
   close = function()
     H.closed = true
   end,
+  setWantsSecondTicks = function(v)
+    H.secondTicks = v
+  end,
 }
 
 barWidget = {

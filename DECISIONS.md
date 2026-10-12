@@ -233,3 +233,12 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
 - **Why:** the result has to be visible without scrolling (it was the root cause of D23). The event has no local
   or VPN timing, so those chips show state only. The form was not split into two columns because 520 px leaves
   too little room for both.
+
+## D28. Save flow: back to the list, flash the row, keep the two-step test
+
+- **What:** a successful save returns to the list, shows "Saved <name>" and "Saved to <config path>" for 5 s,
+  highlights the saved row (`out.id` from `monitor add --json`) for 5 s and clears the form, its result and the
+  handoff path. Expiry runs on panel second ticks, which are switched off again when nothing is flashing. A
+  failed save stays on the form with the error in the result card (D27). Cancel discards the draft.
+- **D20's two-step flow stays:** the first click tests, the second saves. It no longer conflicts with usability
+  because the result is now always visible (D27), and it keeps the PRD's "test before save" guarantee (Story 1).
