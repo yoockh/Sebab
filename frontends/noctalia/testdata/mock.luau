@@ -18,6 +18,7 @@ H = {
   commands = { sebab = true },
   asyncReplies = {}, -- queue of { exitCode, stdout, stderr }
   pendingAsync = {},
+  pendingOverview = {},
   rendered = nil,
   bar = {},
   decoded = {}, -- json line -> table (filled by the Go harness)
@@ -60,6 +61,11 @@ noctalia = {
       end
     end
     table.insert(H.runs, argv)
+    if cb ~= nil and type(argv) == "table" and argv[2] == "overview" then
+      -- Background dashboard loads get their own queue (H.replyOverview).
+      table.insert(H.pendingOverview, cb)
+      return true
+    end
     if cb ~= nil then
       table.insert(H.pendingAsync, { argv = argv, cb = cb })
     end
@@ -376,6 +382,17 @@ function H.click(tree, pred)
   else
     cb()
   end
+end
+
+-- replyOverview answers every pending `sebab overview` load with the key of a
+-- decoded table (see H.decoded).
+function H.replyOverview(stdoutKey)
+  local pending = H.pendingOverview
+  H.pendingOverview = {}
+  for _, cb in ipairs(pending) do
+    cb({ exitCode = 0, stdout = stdoutKey, stderr = "", timedOut = false, stdoutTruncated = false, stderrTruncated = false })
+  end
+  return #pending
 end
 
 -- reply completes the oldest pending runAsync call.

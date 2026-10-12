@@ -275,7 +275,10 @@ type Stats struct {
 	Checks       int
 	Availability float64 // 0..1
 	P50, P95     int64
+	Judged       int // checks that were up, degraded or down
 }
+
+func (s Stats) judged() bool { return s.Judged > 0 }
 
 // Summarize computes Stats over samples.
 func Summarize(samples []Sample) Stats {
@@ -295,6 +298,7 @@ func Summarize(samples []Sample) Stats {
 			lat = append(lat, s.TotalMS)
 		}
 	}
+	st.Judged = judged
 	if judged > 0 {
 		st.Availability = float64(good) / float64(judged)
 	}

@@ -6,10 +6,14 @@ local function checkFrame(where, lastKey)
   local root = H.rendered
   H.assert(root.type == "column" and root.props.flexGrow == 1, where .. ": root must grow")
   H.assert(root.children[1].type == "row", where .. ": header first")
-  local scroll = root.children[2]
-  H.assert(scroll.type == "scroll" and scroll.props.flexGrow == 1, where .. ": scroll second and growing")
+  local si = 2
+  if root.children[2].props.key == "tabs" then
+    si = 3 -- tabs pinned under the header (D31)
+  end
+  local scroll = root.children[si]
+  H.assert(scroll.type == "scroll" and scroll.props.flexGrow == 1, where .. ": scroll after the header and growing")
   for i, c in ipairs(root.children) do
-    if i ~= 2 then
+    if i ~= si then
       H.assert(c.props.flexGrow == nil, where .. ": only the scroll may grow (child " .. i .. ")")
     end
   end
@@ -17,7 +21,7 @@ local function checkFrame(where, lastKey)
   H.assert(#spacers == 0, where .. ": no ui.spacer placeholders")
   if lastKey ~= nil then
     local found = false
-    for i = 3, #root.children do
+    for i = si + 1, #root.children do
       if root.children[i].props.key == lastKey then
         found = true
       end

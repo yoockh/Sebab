@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -311,5 +312,46 @@ func TestPanelSavePathPersistsAcrossDaemonRestart(t *testing.T) {
 	code, out, _ = w.run("", "monitor", "list", "--json")
 	if code != 0 || !strings.Contains(out, `"id":"example"`) {
 		t.Fatalf("list after restart: %s", out)
+	}
+}
+
+func TestOverviewCommand(t *testing.T) {
+	w := newWorld(t)
+	code, out, _ := w.run("", "overview")
+	if code != 0 || !strings.Contains(out, `"uptime":null`) || !strings.Contains(out, `"incidents":[]`) {
+		t.Fatalf("empty overview: %d %s", code, out)
+	}
+	_ = os.MkdirAll(filepath.Dir(w.configPath()), 0o700)
+	cfg := &config.Config{Defaults: config.Defaults{FailThreshold: 1}}
+	_ = cfg.Save(w.configPath())
+	if code, _, e := w.run("", "monitor", "add", "--name", "Gateway", "--target", w.url("/status/502"), "--no-test"); code != 0 {
+		t.Fatal(e)
+	}
+	wt := w.startWatch("--embedded")
+	wt.waitFor(t, "down", checkFor("gateway", "down"))
+	wt.stop(t)
+	code, out, _ = w.run("", "overview", "--buckets", "12")
+	var ov struct {
+		V        int `json:"v"`
+		Buckets  int `json:"buckets"`
+		Monitors map[string]struct {
+			Strip []string `json:"strip"`
+		} `json:"monitors"`
+		Incidents []struct {
+			Monitor string `json:"m"`
+			To      string `json:"to"`
+		} `json:"incidents"`
+	}
+	if err := json.Unmarshal([]byte(out), &ov); err != nil || code != 0 {
+		t.Fatalf("decode %d %q: %v", code, out, err)
+	}
+	if ov.V != 1 || ov.Buckets != 12 || len(ov.Monitors["gateway"].Strip) != 12 || ov.Monitors["gateway"].Strip[11] != "down" {
+		t.Fatalf("overview %s", out)
+	}
+	if len(ov.Incidents) == 0 || ov.Incidents[0].Monitor != "gateway" || ov.Incidents[0].To != "down" {
+		t.Fatalf("incidents %s", out)
+	}
+	if code, _, _ := w.run("", "overview", "--buckets", "0"); code != ExitUsage {
+		t.Error("bad buckets should be a usage error")
 	}
 }

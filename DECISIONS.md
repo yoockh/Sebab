@@ -268,3 +268,18 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   draft intact. Every form field has a one-line hint under it (`fieldhelp.*`). Interval and expected status
   became full-width fields so their hints fit. All strings are nested keys in `translations/en.json`; the help
   can also be opened with the panel IPC event `help`.
+
+## D31. Panel dashboard: overview card, row trends, incidents tab
+
+- **What:** the list view gets a tab row pinned under the header (Monitors / Incidents, claude-cockpit style,
+  D25). The Monitors tab starts with an overview card: a segmented bar of the live counts (up, degraded, down,
+  unknown, paused; segments sized by count) and the 24 h uptime. Each monitor row gets a second line: a 24 h status
+  strip (one segment per hour, worst status in that hour, tooltip with the monitor's uptime) and a latency
+  sparkline (`ui.graph`) of the engine's `recent_ms`, failures drawn as spikes in the error colour. The
+  Incidents tab lists recent status changes (time, new status, monitor, cause code, summary and side).
+- **Data:** a new additive command `sebab overview --json` (its own `"v": 1`) aggregates the JSONL history (D22)
+  in Go, so the panel receives a few KB instead of every sample; schema v1 events are unchanged. It reads the
+  history files directly, so it also works without a running engine. The panel loads it quietly (no busy state)
+  on open, after a save, and from engine state updates at most once a minute; no constant timer.
+- **Empty states:** "no history yet" for uptime and strips, "No status changes in the last 24 h." for incidents,
+  and "Loading history..." until the first answer.

@@ -83,7 +83,7 @@ H.contains(text, "panel.cause_line|", "cause line")
 H.contains(text, "side=side.theirs", "side")
 H.contains(text, "timings=DNS 12 ms, TCP 38 ms, TLS panel.failed", "timing breakdown")
 H.contains(text, "panel.since|", "down since")
-local graphs = H.find(H.rendered, function(n) return n.type == "graph" end)
+local graphs = H.find(H.rendered, function(n) return n.type == "graph" and n.props.key == "spark-api" end)
 H.assert(#graphs == 1 and #graphs[1].props.values == 5 and graphs[1].props.values2[3] == 1, "latency sparkline with failures")
 
 -- Story 11: copy diagnosis through `sebab report`.

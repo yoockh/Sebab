@@ -84,7 +84,18 @@
     "mute": "Mute notifications",
     "unmute": "Unmute notifications",
     "saved_to": "Saved to {path}",
-    "exit_code": "sebab exited with code {code}"
+    "exit_code": "sebab exited with code {code}",
+    "overview": "Overview",
+    "uptime": "{pct}% up, last 24 h",
+    "uptime_none": "no history yet",
+    "no_results": "No results yet.",
+    "strip_tip": "Last 24 h, one segment per hour",
+    "strip_uptime": "Last 24 h: {pct}% up",
+    "no_history": "no history yet",
+    "tab_monitors": "Monitors",
+    "tab_incidents": "Incidents",
+    "no_incidents": "No status changes in the last 24 h.",
+    "loading_history": "Loading history..."
   },
   "form": {
     "add_title": "Add monitor",

@@ -137,6 +137,27 @@ History lives in `$XDG_STATE_HOME/sebab/history` (0600 files, pruned after
 `sebab report` appends the last 24 h of status changes and stats, which makes
 it an incident report you can paste into a bug ticket.
 
+## sebab overview
+
+```sh
+sebab overview --json                 # last 24 h, 24 hourly segments, 50 incidents
+sebab overview --since 168h --buckets 28 --incidents 20
+```
+
+Prints one JSON object built from the local history (no engine needed), used by
+the Noctalia panel's dashboard:
+
+```json
+{"v":1,"since_s":86400,"buckets":24,"checks":96,"uptime":0.979,
+ "monitors":{"payments-api":{"checks":24,"uptime":0.958,"strip":["up","up","down","",...]}},
+ "incidents":[{"t":1791800000000,"m":"payments-api","n":"Payments API","from":"up","to":"down",
+               "c":"TLS_EXPIRED","sum":"TLS certificate expired 2 days ago","side":"theirs"}]}
+```
+
+`uptime` is the share of up or degraded checks among judged ones (null without
+data); each strip segment is the worst status seen in that time slice, `""` when
+there was no check; incidents are newest first.
+
 ## sebab notify-test
 
 Sends one test notification to the desktop (`org.freedesktop.Notifications`)

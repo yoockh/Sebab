@@ -109,3 +109,39 @@ func Sparkline(values []int64, width int) string {
 	}
 	return b.String()
 }
+
+// runOverview prints the dashboard summary used by the Noctalia panel: overall
+// and per-monitor uptime, a status strip per monitor, and recent status changes.
+// It reads the local history directly, so it works with or without an engine.
+func runOverview(_ context.Context, env Env, args []string) int {
+	fs := newFlagSet("overview", env)
+	since := fs.Duration("since", 24*time.Hour, "period to summarise")
+	buckets := fs.Int("buckets", 24, "segments in each status strip (1-96)")
+	incidents := fs.Int("incidents", 50, "maximum status changes to list")
+	_ = fs.Bool("json", true, "print JSON (the only format)")
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
+	}
+	if *buckets < 1 || *buckets > 96 || *since < time.Hour || *since > 30*24*time.Hour {
+		return usageError(env, "overview: --buckets must be 1-96 and --since between 1h and 720h")
+	}
+	rt, err := newRuntime(env)
+	if err != nil {
+		return errorf(env, "%v", err)
+	}
+	cfg, err := rt.loadConfig()
+	if err != nil {
+		cfg = &config.Config{}
+	}
+	h := openHistory(rt, cfg)
+	if h == nil {
+		return printJSON(env, rt.redactor, history.Overview{V: 1, SinceS: int64(since.Seconds()), Buckets: *buckets,
+			Monitors: map[string]history.MonitorOverview{}, Incidents: []history.Transition{}})
+	}
+	defer h.Close()
+	ov, err := h.BuildOverview(time.Now(), *since, *buckets, *incidents)
+	if err != nil {
+		return errorf(env, "overview: %v", err)
+	}
+	return printJSON(env, rt.redactor, ov)
+}

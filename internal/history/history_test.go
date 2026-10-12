@@ -111,3 +111,48 @@ func TestFirstFailureIsATransition(t *testing.T) {
 		t.Fatalf("failed check should be -1 in the ring: %v", r)
 	}
 }
+
+func TestOverview(t *testing.T) {
+	s, _ := Open(t.TempDir(), 7, 30)
+	defer s.Close()
+	now := time.Now().Truncate(time.Hour).Add(30 * time.Minute)
+	rec := func(id string, ago time.Duration, st event.Status, code string) {
+		if err := s.Record(check(id, now.Add(-ago), st, code, 10)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec("api", 23*time.Hour+10*time.Minute, event.StatusUp, "")
+	rec("api", 23*time.Hour, event.StatusDown, "HTTP_BAD_GATEWAY")
+	rec("api", 30*time.Minute, event.StatusUp, "")
+	rec("db", 2*time.Hour, event.StatusUnknown, "LOCAL_OFFLINE")
+	rec("old", 30*time.Hour, event.StatusDown, "TCP_REFUSED") // outside the window
+	ov, err := s.BuildOverview(now, 24*time.Hour, 24, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ov.V != 1 || ov.Buckets != 24 || ov.Checks != 4 {
+		t.Fatalf("header %+v", ov)
+	}
+	api := ov.Monitors["api"]
+	if api.Checks != 3 || api.Uptime == nil || *api.Uptime < 0.66 || *api.Uptime > 0.67 {
+		t.Fatalf("api %+v", api)
+	}
+	if api.Strip[0] != "up" || api.Strip[1] != "down" || api.Strip[23] != "up" || api.Strip[12] != "" {
+		t.Errorf("strip %v (worst status per bucket, empty when no check)", api.Strip)
+	}
+	if db := ov.Monitors["db"]; db.Uptime != nil {
+		t.Errorf("unknown-only monitor has no uptime: %+v", db)
+	}
+	if _, ok := ov.Monitors["old"]; ok {
+		t.Error("samples outside the window must be ignored")
+	}
+	if len(ov.Incidents) == 0 || ov.Incidents[0].Monitor != "api" || ov.Incidents[0].To != event.StatusUp {
+		t.Errorf("incidents newest first: %+v", ov.Incidents)
+	}
+	empty, _ := Open(t.TempDir(), 7, 30)
+	defer empty.Close()
+	e, _ := empty.BuildOverview(now, 24*time.Hour, 24, 10)
+	if e.Uptime != nil || len(e.Monitors) != 0 || e.Incidents == nil {
+		t.Errorf("empty overview %+v", e)
+	}
+}

@@ -25,6 +25,10 @@ local handoffPath = nil
 local confirmId = nil
 local highlightId, highlightUntil = nil, 0 -- row to highlight after a save (D28)
 local toastUntil = 0
+local tab = "monitors" -- list view tab: monitors | incidents (D31)
+local overview = nil -- last `sebab overview --json` result
+local overviewAt = 0
+local overviewLoading = false
 
 -- How long the "Saved" line and the row highlight stay (ms).
 local FLASH_MS = 5000
@@ -74,6 +78,33 @@ local function run(argv, label, timeoutMs, cb)
     busy = nil
     toast = tr("panel.command_failed")
     render()
+  end
+end
+
+local render2 -- forward declaration for quiet loads
+
+-- loadOverview fetches the 24 h dashboard data without touching the busy state
+-- (D31). Throttled to once a minute unless forced.
+local function loadOverview(force)
+  local bin = binary()
+  local now = noctalia.nowMs()
+  if bin == nil or overviewLoading or (not force and now - overviewAt < 60000) then
+    return
+  end
+  overviewLoading = true
+  local ok = noctalia.runAsync({ bin, "overview", "--json" }, function(res)
+    overviewLoading = false
+    overviewAt = noctalia.nowMs()
+    local v = noctalia.json.decode(noctalia.string.trim(res.stdout or ""))
+    if res.exitCode == 0 and type(v) == "table" and v.v == 1 then
+      overview = v
+      if view == "list" then
+        render2()
+      end
+    end
+  end, 15000)
+  if not ok then
+    overviewLoading = false
   end
 end
 
@@ -348,6 +379,7 @@ local function save()
       toast = tr("panel.saved", { name = trim(form.name) }) .. "\n" .. tr("panel.saved_to", { path = configPathDisplay() })
       toastUntil = noctalia.nowMs() + FLASH_MS
       highlightId, highlightUntil = out.id or form.id, noctalia.nowMs() + FLASH_MS
+      loadOverview(true)
       panel.setWantsSecondTicks(true)
       if out.warning ~= nil then
         toast = toast .. "\n" .. out.warning
@@ -495,6 +527,39 @@ local function details(m)
     fill = "surface_variant/0.5" }, rows)
 end
 
+local STRIP_COLOR = { up = "primary", degraded = "tertiary", down = "error", unknown = "on_surface/0.45",
+  paused = "on_surface/0.25" }
+
+-- trendLine is a row's second line: the 24 h status strip and the latency
+-- sparkline of the latest checks (D31). nil when there is nothing to draw.
+local function trendLine(m)
+  local mo = overview and overview.monitors and overview.monitors[m.id]
+  local values, failures = common.sparkline(m.recent)
+  if (mo == nil or mo.strip == nil) and values == nil then
+    return nil
+  end
+  local cells = {}
+  if mo ~= nil and type(mo.strip) == "table" then
+    local segs = {}
+    for i, st in ipairs(mo.strip) do
+      table.insert(segs, ui.box({ key = "seg-" .. i, flexGrow = 1, height = 8, radius = 2,
+        fill = STRIP_COLOR[st] or "on_surface/0.08" }))
+    end
+    local tip = tr("panel.strip_tip")
+    if type(mo.uptime) == "number" then
+      tip = tr("panel.strip_uptime", { pct = string.format("%.1f", mo.uptime * 100) })
+    end
+    table.insert(cells, ui.row({ key = "strip-" .. m.id, flexGrow = 1, gap = 1, align = "center", tooltip = tip }, segs))
+  else
+    table.insert(cells, muted(tr("panel.no_history"), { flexGrow = 1 }))
+  end
+  if values ~= nil then
+    table.insert(cells, ui.graph({ key = "spark-row-" .. m.id, values = values, values2 = failures, color = "primary",
+      color2 = "error", lineWidth = 1.2, fillOpacity = 0.15, width = 110, height = 18 }))
+  end
+  return ui.row({ key = "trend-" .. m.id, gap = 8, align = "center", paddingH = 4 }, cells)
+end
+
 local function monitorRow(m)
   local latency = m.timings and m.timings.total
   local nowS = noctalia.nowMs() / 1000
@@ -515,10 +580,18 @@ local function monitorRow(m)
   local flash = highlightId == m.id and noctalia.nowMs() < highlightUntil
   local header = ui.row({ key = "row-" .. m.id, gap = 8, align = "center", paddingV = 4, paddingH = 4, radius = 6,
     fill = flash and "primary/0.18" or "surface/0", onClick = function() expanded[id] = not expanded[id]; render() end }, cells)
-  if not open then
+  local children = { header }
+  local trend = trendLine(m)
+  if trend ~= nil then
+    table.insert(children, trend)
+  end
+  if open then
+    table.insert(children, details(m))
+  end
+  if #children == 1 then
     return header
   end
-  return ui.column({ key = "item-" .. m.id, gap = 4 }, { header, details(m) })
+  return ui.column({ key = "item-" .. m.id, gap = 4 }, children)
 end
 
 local function banner(glyph, color, text, action)
@@ -574,8 +647,12 @@ end
 -- frame is the shared panel layout (D26): the header pinned at the top, the
 -- body scrolling in all the remaining height, and the pinned parts (cards,
 -- action buttons, status line) at the bottom. nil entries are skipped.
-local function frame(headerNode, scrollKey, body, pinned)
-  local children = { headerNode, ui.scroll({ key = scrollKey, flexGrow = 1, gap = 10, align = "stretch" }, body) }
+local function frame(headerNode, scrollKey, body, pinned, top)
+  local children = { headerNode }
+  if top ~= nil then
+    table.insert(children, top) -- pinned under the header (tabs)
+  end
+  table.insert(children, ui.scroll({ key = scrollKey, flexGrow = 1, gap = 10, align = "stretch" }, body))
   for i = 1, pinned.n or #pinned do
     if pinned[i] ~= nil then
       table.insert(children, pinned[i])
@@ -584,9 +661,84 @@ local function frame(headerNode, scrollKey, body, pinned)
   return ui.column({ key = "frame-" .. scrollKey, flexGrow = 1, gap = 10 }, children)
 end
 
+local SEGMENTS = { { "up", "primary" }, { "degraded", "tertiary" }, { "down", "error" }, { "unknown", "on_surface/0.45" },
+  { "paused", "on_surface/0.25" } }
+
+-- overviewCard: segmented bar of monitor counts and the 24 h uptime (D31).
+local function overviewCard(s)
+  local sum = s and s.summary
+  local segs, total = {}, 0
+  for _, seg in ipairs(SEGMENTS) do
+    local n = sum and sum[seg[1]] or 0
+    if n > 0 then
+      total += n
+      table.insert(segs, ui.box({ key = "ov-" .. seg[1], flexGrow = n, height = 10, radius = 3, fill = seg[2],
+        tooltip = `{n} {common.statusLabel(seg[1])}` }))
+    end
+  end
+  local uptime = tr("panel.uptime_none")
+  if overview ~= nil and type(overview.uptime) == "number" then
+    uptime = tr("panel.uptime", { pct = string.format("%.1f", overview.uptime * 100) })
+  end
+  local children = { ui.row({ gap = 8, align = "center" }, {
+    ui.label({ text = tr("panel.overview"), fontWeight = "semibold", flexGrow = 1 }), muted(uptime) }) }
+  if total > 0 then
+    table.insert(children, ui.row({ key = "ov-bar", gap = 2 }, segs))
+    table.insert(children, muted(summaryText(s)))
+  else
+    table.insert(children, muted(tr("panel.no_results")))
+  end
+  return ui.column({ key = "overview-card", gap = 6, padding = 10, radius = 10, fill = "surface_variant/0.5" }, children)
+end
+
+local function sideWord(side)
+  return side == "yours" and tr("card.side_yours") or side == "theirs" and tr("card.side_theirs") or tr("card.side_unclear")
+end
+
+-- incidentsBody lists recent status changes from the local history (D31).
+local function incidentsBody()
+  local list = overview and overview.incidents or {}
+  if #list == 0 then
+    return { muted(overview == nil and tr("panel.loading_history") or tr("panel.no_incidents"), { maxLines = 3 }) }
+  end
+  local rows = {}
+  for i, inc in ipairs(list) do
+    local to = inc.to or "unknown"
+    local children = {
+      ui.row({ gap = 8, align = "center" }, {
+        muted(common.clock(math.floor((inc.t or 0) / 1000)), { width = 52 }),
+        pill(to),
+        ui.label({ text = inc.n or inc.m or "", flexGrow = 1, maxLines = 1 }),
+        muted(inc.c or "", { maxLines = 1 }),
+      }),
+    }
+    if inc.sum ~= nil and inc.sum ~= "" then
+      table.insert(children, muted(inc.sum .. " (" .. sideWord(inc.side) .. ")", { maxLines = 2 }))
+    end
+    table.insert(rows, ui.column({ key = "inc-" .. i, gap = 2, paddingV = 4 }, children))
+  end
+  return rows
+end
+
+local function tabs()
+  local function tabButton(id, glyph)
+    return ui.button({ key = "tab-" .. id, text = tr("panel.tab_" .. id), glyph = glyph, controlSize = "sm",
+      variant = tab == id and "primary" or "ghost", flexGrow = 1,
+      onClick = function()
+        tab = id
+        loadOverview(false)
+        render()
+      end })
+  end
+  return ui.row({ key = "tabs", gap = 6 }, { tabButton("monitors", "heart-rate-monitor"), tabButton("incidents", "history") })
+end
+
 local function listView()
   local s = snapshot
-  local body = { muted(summaryText(s)) }
+  if tab == "incidents" then
+    return frame(header(tr("panel.title"), {}), "incidents-scroll", incidentsBody(), { statusLine(), n = 1 }, tabs())
+  end
+  local body = { overviewCard(s) }
   if s == nil or s.engine == "missing" then
     table.insert(body, banner("alert-triangle", "tertiary", tr("panel.missing_binary"),
       ui.button({ text = tr("panel.settings"), controlSize = "sm", onClick = function() noctalia.openSettings() end })))
@@ -612,7 +764,7 @@ local function listView()
     ui.button({ glyph = "refresh", variant = "ghost", tooltip = tr("panel.check_all"),
       onClick = function() simple({ "refresh" }, tr("panel.busy_refresh"), tr("panel.refresh_sent")) end }),
     ui.button({ glyph = "plus", variant = "primary", tooltip = tr("panel.add"), onClick = openAdd }),
-  }), "list-scroll", body, { statusLine(), n = 1 })
+  }), "list-scroll", body, { statusLine(), n = 1 }, tabs())
 end
 
 -- field is a labelled control with a one-line helper text under it (D30).
@@ -820,6 +972,10 @@ local function confirmView()
   })
 end
 
+render2 = function()
+  render()
+end
+
 render = function()
   if view == "form" and form ~= nil then
     panel.render(formView())
@@ -834,6 +990,7 @@ end
 
 noctalia.state.watch(common.STATE_KEY, function(value)
   snapshot = value
+  loadOverview(false)
   if view == "list" or view == "confirm" then
     render()
   end
@@ -842,6 +999,7 @@ end)
 function onOpen(context)
   snapshot = noctalia.state.get(common.STATE_KEY)
   toast = nil
+  loadOverview(true)
   -- A draft kept from an outside-click close reopens as it was (D29).
   if context == "add" and not (view == "form" and form ~= nil and form.mode == "add") then
     openAdd()
@@ -852,11 +1010,15 @@ end
 
 -- Panel IPC, for keybinds and scripted checks (the panel must be open):
 --   noctalia msg plugin yoockh/sebab:panel all add [url-or-host:port]
---   noctalia msg plugin yoockh/sebab:panel all test | save | cancel
+--   noctalia msg plugin yoockh/sebab:panel all test | save | cancel | help | monitors | incidents
 -- `noctalia msg panel-open yoockh/sebab:panel add` opens the add form directly.
 function onIpc(event, payload)
   if event == "help" then
     openHelp()
+  elseif event == "incidents" or event == "monitors" then
+    tab, view = event, "list"
+    loadOverview(false)
+    render()
   elseif event == "add" then
     openAdd()
     if payload ~= nil and trim(payload) ~= "" then
