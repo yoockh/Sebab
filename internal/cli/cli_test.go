@@ -321,3 +321,18 @@ func TestMonitorMuteUnmute(t *testing.T) {
 		t.Fatal("still muted")
 	}
 }
+
+func TestTUIRequiresTerminal(t *testing.T) {
+	w := newWorld(t)
+	if code, _, _ := w.run("", "tui"); code != ExitUsage {
+		t.Fatalf("tui without a terminal should be a usage error, got %d", code)
+	}
+	f := &lineFeeder{}
+	var got []string
+	f.apply = func(b []byte) { got = append(got, string(b)) }
+	_, _ = f.Write([]byte("a\nb"))
+	_, _ = f.Write([]byte("c\n"))
+	if len(got) != 2 || got[1] != "bc" {
+		t.Fatalf("line splitting: %v", got)
+	}
+}

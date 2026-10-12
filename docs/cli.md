@@ -143,6 +143,13 @@ Sends one test notification to the desktop (`org.freedesktop.Notifications`)
 and to every `[[notify]]` channel (webhook, ntfy, Telegram; see `config.md`),
 and prints the result of each. Exit code 1 when any channel failed.
 
+## sebab tui
+
+Interactive terminal view of every monitor (Phase 4): status, latency, last
+check and cause; Enter shows hint, side, timings, "down since" and a latency
+sparkline. Keys: up/down or j/k, Enter, r (check now), q. Attaches to a running
+engine or starts an embedded one. `NO_COLOR=1` disables colours.
+
 ## sebab refresh / report / doctor
 
 ```sh

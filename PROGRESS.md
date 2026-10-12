@@ -126,7 +126,7 @@ Story 12: Install and setup (Must)
 | Quiet hours, per-monitor mute | done | c9541e0 |
 | Webhook / ntfy / Telegram | done (`sebab notify-test`) | ae29cab |
 | Opt-in Globalping "down for everyone" check | not done: not in the requested Phase 3 list, contacts a third party | |
-| Phase 4: TUI (`sebab tui`) | todo | |
+| Phase 4: TUI (`sebab tui`) | done (smoke-tested under a pty) | TUI_COMMIT |
 | Phase 4: GNOME / KDE frontends | not planned here (PRD: author or contributors) | |
 
 ## Needs human
@@ -147,4 +147,5 @@ Story 12: Install and setup (Must)
 
 ## Next up
 
-Phase 4: `sebab tui`. Handoff docs (TESTING.md, README.md, docs/) are written and current.
+Remaining PRD items are Phase 5 (schema freeze and migrations, docs site, i18n, security review, reproducible
+and signed releases); most need a human. Handoff docs (TESTING.md, README.md, docs/) are current.

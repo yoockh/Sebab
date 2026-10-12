@@ -228,6 +228,8 @@ binary to `/usr/bin` (the unit runs `/usr/bin/sebab daemon`); `sebab waybar` pri
 `frontends/waybar`); with no frontend attached the daemon sends desktop notifications itself; suspend and resume
 the laptop: a "system resumed: checks continue in 15s" notice and no false alerts.
 
+**Phase 4:** `sebab tui` in a terminal: arrows move, Enter expands, r checks now, q quits.
+
 **Phase 3:** `sebab history <id>`; `sebab report <id>`; `--assert` (docs/cli.md); `quiet_hours`; `sebab monitor
 mute <id>`; `[[notify]]` channels with `sebab notify-test` (point a webhook at `python3 -m http.server` on loopback
 to see the POST, or at your own ntfy/Telegram).
@@ -259,6 +261,6 @@ to see the POST, or at your own ntfy/Telegram).
 - **Unix socket path limit:** `$XDG_RUNTIME_DIR/sebab/sebab.sock` must stay under 108 bytes; with an unusually long
   runtime dir the socket is skipped (a warning is printed) and frontends cannot share the engine.
 - **Not implemented:** the opt-in Globalping "is it down for everyone" check (Phase 3, contacts a third party),
-  TUI, GNOME and KDE frontends (Phase 4), Phase 5 items.
+  GNOME and KDE frontends (Phase 4), Phase 5 items.
 - **D-Bus notifications from the daemon** use the generic `org.freedesktop.Notifications` API: no actions, no
   replacing of earlier notifications.

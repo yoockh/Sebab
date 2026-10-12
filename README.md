@@ -59,6 +59,7 @@ Frontends:
 
 - **Noctalia:** the `yoockh/sebab` plugin in `frontends/noctalia/sebab` (bar widget, panel, notifications).
 - **Waybar:** `frontends/waybar` (`sebab waybar` with `return-type: json`).
+- **Terminal:** `sebab tui`.
 
 ## Documentation
 

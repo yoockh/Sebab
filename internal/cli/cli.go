@@ -55,6 +55,7 @@ func commands() map[string]command {
 		"history":      {"show availability, latency and status changes from local history", runHistory},
 		"kill-session": {"stop a 'sebab watch --session' process (used by frontends)", runKillSession},
 		"waybar":       {"print Waybar custom-module JSON (return-type json)", runWaybar},
+		"tui":          {"show monitors in the terminal (interactive)", runTUI},
 		"version":      {"print the version", runVersion},
 	}
 }
