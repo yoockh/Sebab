@@ -126,7 +126,7 @@ Story 12: Install and setup (Must)
 | Quiet hours, per-monitor mute | done | c9541e0 |
 | Webhook / ntfy / Telegram | done (`sebab notify-test`) | ae29cab |
 | Opt-in Globalping "down for everyone" check | not done: not in the requested Phase 3 list, contacts a third party | |
-| Phase 4: TUI (`sebab tui`) | done (smoke-tested under a pty) | TUI_COMMIT |
+| Phase 4: TUI (`sebab tui`) | done (smoke-tested under a pty) | e09a432 |
 | Phase 4: GNOME / KDE frontends | not planned here (PRD: author or contributors) | |
 
 ## Needs human
