@@ -26,12 +26,6 @@ A story's acceptance criteria are ticked only when a test or a verified manual r
 | 5. Help view and field hints (D30) | done | `panel_help_test.luau`, grim screenshot | b613df3 |
 | 6. Overview card, strips, sparklines, incidents tab (D31) | done | `panel_dashboard_test.luau`, history TestOverview, cli TestOverviewCommand, grim screenshots | 2367706 |
 
-## Documentation
-
-| Item | Status | Proof |
-|---|---|---|
-| README redesign (D32) | done; screenshots `docs/img/panel.png` and `docs/img/tui.png` need a human | links and anchors checked by script, Mermaid rendered with mermaid-cli, sample output captured from the failure lab |
-
 ## Phase 0: foundations
 
 | Item | Status | Commit |
