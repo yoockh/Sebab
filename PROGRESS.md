@@ -7,22 +7,22 @@ A story's acceptance criteria are ticked only when a test or a verified manual r
 
 | Item | Status | Commit |
 |---|---|---|
-| Repo skeleton, go.mod, Makefile, CI, README, LICENSE, DECISIONS, PROGRESS, TESTING | wip | |
-| Event schema v1 as Go types + JSON golden tests | todo | |
-| Spike: `sebab watch --format jsonl` hello + heartbeat | todo | |
-| Spike: Noctalia plugin skeleton shows a live value in the bar | todo | |
+| Repo skeleton, go.mod, Makefile, CI, README, LICENSE, DECISIONS, PROGRESS, TESTING | done | aa088ba |
+| Event schema v1 as Go types + JSON golden tests | done | 17b01fc |
+| Spike: `sebab watch --format jsonl` hello + heartbeat | done | a1efdf8 |
+| Spike: Noctalia plugin skeleton shows a live value in the bar | done (bar placement needs human) | 17b46a1 |
 
 ## Phase 1: MVP
 
 | Item | Status | Commit |
 |---|---|---|
-| Config (TOML, validation, XDG paths, atomic writes) | todo | |
-| Probes: local, VPN, DNS, TCP, TLS, HTTP (timings, injectable clock/dialer) | todo | |
-| Diagnosis: every Appendix B cause code, side detection with canary, hints | todo | |
-| Engine: scheduler, state machine, flap control, notify, heartbeat, offline, suspend guard | todo | |
-| Auth: bearer/header/basic, keyring, `sebab secret set/rm` via stdin, redaction | todo | |
+| Config (TOML, validation, XDG paths, atomic writes) | done | 0372380 |
+| Probes: local, VPN, DNS, TCP, TLS, HTTP (timings, injectable clock/dialer) | done | 6d7cd09 |
+| Diagnosis: every Appendix B cause code, side detection with canary, hints | done | 44ff2f8 |
+| Engine: scheduler, state machine, flap control, notify, heartbeat, offline, suspend guard | done | 64d0c8c |
+| Auth: bearer/header/basic, keyring, `sebab secret set/rm` via stdin, redaction | wip (store+redaction 748da64, CLI pending) | |
 | CLI: check, monitor add/list/edit/rm/pause, watch, doctor | todo | |
-| Failure lab: every Phase 1 cause code, one integration test each | todo | |
+| Failure lab: every Phase 1 cause code, one integration test each | done | 65d09a4 |
 | Noctalia plugin: service, bar widget, panel | todo | |
 | Packaging: AUR PKGBUILDs, goreleaser | todo | |
 | Load plugin into local Noctalia as a dev path source and verify | todo | |
@@ -132,4 +132,4 @@ Story 12: Install and setup (Must)
 
 ## Next up
 
-Phase 0 skeleton.
+CLI commands (check, monitor, secret, watch with control socket, doctor, report), then the full Noctalia plugin.
