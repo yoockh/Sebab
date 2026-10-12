@@ -60,6 +60,9 @@ func TestDoctorNoKeyringOnArch(t *testing.T) {
 	if n := find(fs, "notifications"); n.State != stateOK || !strings.Contains(n.Detail, "noctalia") {
 		t.Errorf("notifications %+v", n)
 	}
+	if v := find(fs, "vpn tools"); v.Area != "" {
+		t.Errorf("no VPN tools and no VPN monitors: nothing to say, got %+v", v)
+	}
 	if i := find(fs, "icmp"); i.State != stateInfo || !strings.Contains(i.Fix, "ping_group_range") {
 		t.Errorf("icmp %+v", i)
 	}
@@ -97,5 +100,30 @@ func TestDoctorOnlineCanaryUsesConfig(t *testing.T) {
 	_, fs := doctorFindings(t, w, "--online")
 	if c := find(fs, "canary"); c.State != stateOK {
 		t.Errorf("canary %+v", c)
+	}
+}
+
+func TestDoctorVPNTooling(t *testing.T) {
+	w := newWorld(t)
+	withDoctorDeps(t, linuxplat.NameStatus{Owned: true}, true, "arch")
+	if code, _, _ := w.run("", "monitor", "add", "--name", "A", "--target", w.url("/ok"), "--vpn", "wg0", "--no-test"); code != 0 {
+		t.Fatal("add")
+	}
+	_, fs := doctorFindings(t, w)
+	if v := find(fs, "vpn tools"); !strings.Contains(v.Fix, "sudo pacman -S wireguard-tools") {
+		t.Errorf("vpn tools %+v", v)
+	}
+	testDoctorDeps.lookPath = func(name string) (string, error) {
+		if name == "nmcli" {
+			return "/usr/bin/nmcli", nil
+		}
+		return "", errors.New("no")
+	}
+	_, fs = doctorFindings(t, w)
+	if v := find(fs, "vpn tools"); !strings.Contains(v.Detail, "nmcli") || !strings.Contains(v.Detail, "never starts") {
+		t.Errorf("vpn tools %+v", v)
+	}
+	if v := find(fs, "vpn"); !strings.Contains(v.Detail, "wg0") {
+		t.Errorf("vpn interface %+v", v)
 	}
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,13 +27,18 @@ func (w *world) startDaemon() func() {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	var once sync.Once
 	stop := func() {
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			w.t.Fatal("daemon did not stop")
-		}
+		once.Do(func() {
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				buf := make([]byte, 1<<20)
+				n := goruntime.Stack(buf, true)
+				w.t.Errorf("daemon did not stop\n%s", buf[:n])
+			}
+		})
 	}
 	w.t.Cleanup(stop)
 	return stop
@@ -138,4 +145,22 @@ func TestWaybarCommand(t *testing.T) {
 	}
 	// Waybar does not show notifications, so the embedded engine does.
 	w.waitNotified(t, "Gateway is down")
+}
+
+// Phase 2: watch attaches to the daemon and takes over with an embedded engine
+// when the daemon goes away.
+func TestWatchFallsBackWhenDaemonStops(t *testing.T) {
+	w := newWorld(t)
+	if code, _, e := w.run("", "monitor", "add", "--name", "Web", "--target", w.url("/ok"), "--no-test"); code != 0 {
+		t.Fatal(e)
+	}
+	stopDaemon := w.startDaemon()
+	wt := w.startWatch()
+	wt.waitFor(t, "daemon hello", func(ev map[string]any) bool { return ev["type"] == "hello" && ev["source"] == "daemon" })
+	stopDaemon()
+	wt.waitFor(t, "embedded hello", func(ev map[string]any) bool { return ev["type"] == "hello" && ev["source"] == "embedded" })
+	wt.waitFor(t, "check from the embedded engine", checkFor("web", "up"))
+	if code, _, _ := w.run("", "refresh"); code != 0 {
+		t.Fatal("the embedded engine should now serve the socket")
+	}
 }

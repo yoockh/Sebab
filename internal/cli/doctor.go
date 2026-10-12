@@ -106,6 +106,7 @@ func (d *doctor) run(ctx context.Context, online bool) {
 	d.checkNotifications(ctx)
 	d.checkNetwork()
 	d.checkVPNs()
+	d.checkVPNTools()
 	d.checkICMP()
 	d.checkProxies()
 	d.checkEngine()
@@ -232,6 +233,30 @@ func (d *doctor) checkVPNs() {
 		default:
 			d.add("vpn", stateOK, iface+" is up", "")
 		}
+	}
+}
+
+// checkVPNTools lists VPN tooling found on PATH. Sebab never drives these; it
+// only watches the interfaces they create.
+func (d *doctor) checkVPNTools() {
+	var found []string
+	for _, tool := range []string{"wg-quick", "nmcli", "openvpn", "tailscale", "openconnect"} {
+		if _, err := d.deps.lookPath(tool); err == nil {
+			found = append(found, tool)
+		}
+	}
+	needsVPN := false
+	for _, m := range d.cfg.Monitors {
+		if m.RequiresVPN != nil {
+			needsVPN = true
+		}
+	}
+	switch {
+	case len(found) > 0:
+		d.add("vpn tools", stateInfo, "found "+strings.Join(found, ", ")+" (sebab only watches the interface, never starts a VPN)", "")
+	case needsVPN:
+		d.add("vpn tools", stateInfo, "no VPN client found on PATH although monitors require a VPN interface",
+			"install your VPN client, for example "+linuxplat.Install(d.family, "wireguard-tools"))
 	}
 }
 
