@@ -16,6 +16,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: install luau (plugin script tests)
+        run: |
+          curl -sSfL -o /tmp/luau.zip https://github.com/luau-lang/luau/releases/download/0.742/luau-ubuntu.zip
+          mkdir -p /tmp/luau && unzip -q /tmp/luau.zip -d /tmp/luau
+          echo "SEBAB_LUAU=/tmp/luau/luau" >> "$GITHUB_ENV"
       - name: gofmt
         run: make fmt-check
       - name: vet

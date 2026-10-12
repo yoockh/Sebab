@@ -1,3 +1,11 @@
+# Sebab: endpoint monitor that names the failing layer and whose side the fault
+# is on. All probing and diagnosis happens in the external `sebab` engine; this
+# plugin only displays its JSON event stream and calls its CLI.
+#
+#   service  "engine"  runs `sebab watch`, publishes state "sebab", shows notifications
+#   widget   "status"  aggregate state in the bar (left: panel, right: check now)
+#   panel    "panel"   monitor list, details, add/edit/delete/pause, copy diagnosis
+
 id           = "yoockh/sebab"
 name         = "Sebab"
 version      = "0.1.0"
@@ -16,6 +24,13 @@ label_key       = "settings.binary.label"
 description_key = "settings.binary.description"
 default         = "sebab"
 
+[[setting]]
+key             = "notifications"
+type            = "bool"
+label_key       = "settings.notifications.label"
+description_key = "settings.notifications.description"
+default         = true
+
 [[service]]
 id    = "engine"
 entry = "service.luau"
@@ -23,3 +38,20 @@ entry = "service.luau"
 [[widget]]
 id    = "status"
 entry = "widget.luau"
+
+  [[widget.setting]]
+  key             = "compact"
+  type            = "bool"
+  label_key       = "settings.compact.label"
+  description_key = "settings.compact.description"
+  default         = false
+
+[[panel]]
+id                       = "panel"
+entry                    = "panel.luau"
+width                    = 480
+height                   = 640
+placement                = "attached"
+position                 = "auto"
+open_near_click          = true
+dismiss_on_outside_click = false

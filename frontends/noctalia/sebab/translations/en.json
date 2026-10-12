@@ -1,4 +1,128 @@
 {
-  "settings.binary.label": "Engine binary",
-  "settings.binary.description": "Name or absolute path of the sebab executable."
+  "settings": {
+    "binary": {
+      "label": "Engine binary",
+      "description": "Name on PATH or absolute path of the sebab executable."
+    },
+    "notifications": {
+      "label": "Show notifications",
+      "description": "Display the engine's down, recovery, offline and VPN notifications."
+    },
+    "compact": {
+      "label": "Compact",
+      "description": "Show only the icon, plus the number of monitors that are down."
+    }
+  },
+  "status": {
+    "up": "up",
+    "degraded": "degraded",
+    "down": "down",
+    "unknown": "unknown",
+    "paused": "paused"
+  },
+  "side": {
+    "yours": "your side",
+    "theirs": "their side",
+    "unknown": "unknown side"
+  },
+  "time": {
+    "never": "never",
+    "seconds_ago": "{n} s ago",
+    "minutes_ago": "{n} min ago",
+    "hours_ago": "{n} h ago",
+    "days_ago": "{n} d ago"
+  },
+  "widget": {
+    "starting": "Sebab: starting the engine",
+    "setup": "setup",
+    "missing_title": "sebab not found",
+    "missing_hint": "Install the sebab engine (AUR: sebab-bin) or set its path in the plugin settings.",
+    "stalled": "stalled",
+    "stalled_title": "Engine stalled",
+    "stalled_hint": "No heartbeat for 3 intervals. Restarting the engine.",
+    "offline": "offline",
+    "offline_hint": "Your connection is down, so all monitors are paused.",
+    "no_monitors": "No monitors yet. Click to add one.",
+    "all_up": {
+      "one": "1 monitor up",
+      "other": "All {count} monitors up"
+    }
+  },
+  "panel": {
+    "title": "Sebab",
+    "add": "Add monitor",
+    "check_all": "Check all now",
+    "check_now": "Check now",
+    "copy": "Copy diagnosis",
+    "copied": "Diagnosis copied to the clipboard.",
+    "edit": "Edit",
+    "pause": "Pause",
+    "resume": "Resume",
+    "delete": "Delete",
+    "deleted": "Deleted {name}.",
+    "saved": "Saved {name}.",
+    "settings": "Settings",
+    "restart": "Restart",
+    "failed": "failed",
+    "empty": "No monitors yet. Use + to add a URL or host:port.",
+    "missing_binary": "The sebab engine was not found. Install it (AUR: sebab-bin) or set its path in the plugin settings.",
+    "stalled": "The engine stopped sending heartbeats. It is being restarted.",
+    "offline": "You are offline ({cause}). Monitors resume when the network is back.",
+    "command_failed": "The sebab command failed.",
+    "refresh_sent": "Checking now.",
+    "insecure": "TLS verification is disabled for this monitor.",
+    "cause_line": "{code} on the {layer} layer, {side}",
+    "timings": "Timings: {timings}",
+    "since": "{status} since {time} ({ago})",
+    "busy_test": "Testing...",
+    "busy_save": "Saving...",
+    "busy_load": "Loading...",
+    "busy_copy": "Preparing the diagnosis...",
+    "busy_refresh": "Asking the engine...",
+    "busy_secret": "Preparing a secure handoff..."
+  },
+  "form": {
+    "add_title": "Add monitor",
+    "edit_title": "Edit {name}",
+    "name": "Name",
+    "name_hint": "Payments API",
+    "target": "URL or host:port",
+    "target_hint": "https://api.example.com/health or db.example.com:5432",
+    "interval": "Interval (seconds, minimum 30)",
+    "expect": "Expected status codes",
+    "expect_hint": "any 2xx",
+    "auth": "Authentication",
+    "auth_none": "None",
+    "auth_bearer": "Bearer token",
+    "auth_header": "Custom header",
+    "auth_basic": "Basic auth",
+    "header_name": "Header name",
+    "username": "User name",
+    "token": "Secret",
+    "token_hint": "Stored in your keyring, never in config.toml",
+    "token_keep": "Leave empty to keep the stored secret \"{name}\"",
+    "vpn": "Only check while this VPN interface is up",
+    "vpn_hint": "wg0 (optional)",
+    "insecure": "Skip TLS verification (insecure, shown as a warning)",
+    "test": "Test",
+    "test_and_save": "Test, then save",
+    "save": "Save",
+    "cancel": "Cancel",
+    "test_result": "Test result",
+    "err_name": "Enter a name.",
+    "err_target": "Enter a URL or host:port.",
+    "err_url": "Bad URL: use http:// or https://.",
+    "err_port": "Missing port: use host:port, or a full URL.",
+    "err_interval": "The interval must be at least 30 seconds.",
+    "err_expect": "\"{code}\" is not an HTTP status code.",
+    "err_header": "Enter the header name, for example X-API-Key.",
+    "err_username": "Enter the user name.",
+    "err_token": "Enter the secret."
+  },
+  "confirm": {
+    "title": "Delete monitor",
+    "body": "Delete \"{name}\"? This cannot be undone.",
+    "secret_kept": "Its stored secret is kept. Remove it with: sebab secret rm NAME",
+    "delete": "Delete"
+  }
 }

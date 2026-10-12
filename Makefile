@@ -4,7 +4,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/yoockh/sebab/internal/version.Version=$(VERSION)
 GO      ?= go
 
-.PHONY: all build test race vet fmt fmt-check check lab clean plugin-lint
+.PHONY: all build test race vet fmt fmt-check check lab clean plugin-lint plugin-test
 
 all: check build
 
@@ -33,6 +33,11 @@ check: fmt-check vet race
 
 plugin-lint:
 	noctalia plugins lint frontends/noctalia/sebab
+
+# Runs the plugin scripts in a real Luau VM against a mock host.
+# Needs luau on PATH or SEBAB_LUAU=/path/to/luau.
+plugin-test:
+	$(GO) test -count=1 -v ./frontends/noctalia/
 
 clean:
 	rm -rf bin dist coverage.out
