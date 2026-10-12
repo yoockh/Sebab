@@ -108,3 +108,34 @@ func TestDaemonNotificationOwnership(t *testing.T) {
 	}
 	w.assertNoLeak()
 }
+
+func TestWaybarCommand(t *testing.T) {
+	w := newWorld(t)
+	if code, _, e := w.run("", "monitor", "add", "--name", "Gateway", "--target", w.url("/status/502"), "--no-test"); code != 0 {
+		t.Fatal(e)
+	}
+	_ = os.MkdirAll(filepath.Dir(w.configPath()), 0o700)
+	cfg, _ := config.Load(w.configPath())
+	cfg.Defaults.FailThreshold = 1
+	_ = cfg.Save(w.configPath())
+	env, out, _ := w.env("")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	go func() { done <- Run(ctx, []string{"waybar", "--embedded"}, env) }()
+	defer func() { cancel(); <-done }()
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(out.String(), `"alt":"down"`) {
+		if time.Now().After(deadline) {
+			t.Fatalf("no down output:\n%s", out.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !strings.HasPrefix(out.String(), `{"text":"","alt":"starting"`) {
+		t.Errorf("first line should be the starting state:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), `{"text":"1","alt":"down","class":["down"],"tooltip":"Gateway: down, gateway returned 502, the upstream app is likely down"`) {
+		t.Errorf("down line:\n%s", out.String())
+	}
+	// Waybar does not show notifications, so the embedded engine does.
+	w.waitNotified(t, "Gateway is down")
+}

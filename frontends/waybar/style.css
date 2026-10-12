@@ -1,0 +1,29 @@
+/* Sebab module colours. Merge into ~/.config/waybar/style.css. */
+
+#custom-sebab {
+  padding: 0 8px;
+}
+
+#custom-sebab.up {
+  color: #8fbf7f;
+}
+
+#custom-sebab.degraded,
+#custom-sebab.partial {
+  color: #e5b567;
+}
+
+#custom-sebab.down {
+  color: #e06c75;
+  font-weight: bold;
+}
+
+#custom-sebab.offline,
+#custom-sebab.stalled {
+  color: #c678dd;
+}
+
+#custom-sebab.starting,
+#custom-sebab.empty {
+  color: #7f848e;
+}

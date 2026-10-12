@@ -155,3 +155,13 @@ func TestTimestampRoundTrip(t *testing.T) {
 		t.Errorf("round trip %v %v", ts.Time(), err)
 	}
 }
+
+func TestLenientTimestamp(t *testing.T) {
+	var c Check
+	if err := json.Unmarshal([]byte(`{"v":1,"type":"check","ts":"not a time","status":"up"}`), &c); err != nil {
+		t.Fatalf("a bad timestamp must not fail the event: %v", err)
+	}
+	if c.Status != StatusUp || !c.TS.Time().IsZero() {
+		t.Errorf("decoded %+v", c)
+	}
+}

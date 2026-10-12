@@ -77,15 +77,18 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Time(t).UTC().Format(timeLayout))
 }
 
-// UnmarshalJSON implements json.Unmarshaler.
+// UnmarshalJSON implements json.Unmarshaler. Consumers are lenient: an
+// unparseable timestamp decodes to the zero time instead of failing the event.
 func (t *Timestamp) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
-		return fmt.Errorf("timestamp: %w", err)
+		*t = Timestamp{}
+		return nil
 	}
 	parsed, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
-		return fmt.Errorf("timestamp: %w", err)
+		*t = Timestamp{}
+		return nil
 	}
 	*t = Timestamp(parsed)
 	return nil

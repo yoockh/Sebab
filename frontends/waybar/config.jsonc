@@ -1,0 +1,27 @@
+// Sebab module for Waybar. Add "custom/sebab" to modules-left/center/right and
+// merge this block into your Waybar config (~/.config/waybar/config.jsonc).
+{
+  "custom/sebab": {
+    // Long-running: prints one JSON object per state change. Attaches to the
+    // sebab daemon when it runs, otherwise starts an embedded engine.
+    "exec": "sebab waybar",
+    "return-type": "json",
+    "restart-interval": 5,
+    // Do not restart the stream after a click.
+    "exec-on-event": false,
+    // {icon} is chosen by "alt": up, degraded, down, offline, stalled, starting, empty.
+    "format": "{icon} {text}",
+    "format-icons": {
+      "up": "●",
+      "degraded": "▲",
+      "down": "✖",
+      "offline": "⊘",
+      "stalled": "…",
+      "starting": "○",
+      "empty": "○"
+    },
+    "tooltip": true,
+    "on-click": "sebab refresh",
+    "on-click-right": "sh -c 'sebab doctor | head -40 | notify-send -a Sebab \"sebab doctor\" \"$(cat)\"'"
+  }
+}
