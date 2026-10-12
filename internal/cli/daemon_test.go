@@ -270,3 +270,46 @@ func TestExternalChannelsEndToEnd(t *testing.T) {
 	}
 	w.assertNoLeak(wt.out.String())
 }
+
+// Item 7: the panel's save path persists across a daemon restart, starting
+// from no config at all (CONFIG_MISSING).
+func TestPanelSavePathPersistsAcrossDaemonRestart(t *testing.T) {
+	w := newWorld(t)
+	stop := w.startDaemon()
+	front := w.startWatch()
+	front.waitFor(t, "config missing", func(ev map[string]any) bool { return ev["type"] == "error" && ev["code"] == "CONFIG_MISSING" })
+	// Exactly the argv panel.luau builds for "Save" (see save() and commonArgs()).
+	code, out, errOut := w.run("", "monitor", "add", "--json", "--no-test", "--name", "Example", "--target", w.url("/ok"),
+		"--interval", "60s", "--vpn=", "--insecure=false")
+	if code != 0 || !strings.Contains(out, `"ok":true`) {
+		t.Fatalf("panel save argv: %d %s %s", code, out, errOut)
+	}
+	st, err := os.Stat(w.configPath())
+	if err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("config.toml not written with 0600: %v %v", st, err)
+	}
+	if d, _ := os.Stat(filepath.Dir(w.configPath())); d.Mode().Perm() != 0o700 {
+		t.Errorf("config dir mode %v", d.Mode().Perm())
+	}
+	data, _ := os.ReadFile(w.configPath())
+	if !strings.Contains(string(data), "id = 'example'") || !strings.Contains(string(data), "name = 'Example'") {
+		t.Fatalf("config content:\n%s", data)
+	}
+	// The running engine picks it up without a restart (reload over the socket).
+	front.waitFor(t, "monitor checked by the running daemon", checkFor("example", "up"))
+	front.stop(t)
+	stop()
+
+	// Restart the daemon: the monitor is still there.
+	w.startDaemon()
+	again := w.startWatch()
+	ev := again.waitFor(t, "monitors after restart", isType("monitors"))
+	list, _ := ev["monitors"].([]any)
+	if len(list) != 1 || list[0].(map[string]any)["id"] != "example" {
+		t.Fatalf("monitors after restart: %+v", ev)
+	}
+	code, out, _ = w.run("", "monitor", "list", "--json")
+	if code != 0 || !strings.Contains(out, `"id":"example"`) {
+		t.Fatalf("list after restart: %s", out)
+	}
+}

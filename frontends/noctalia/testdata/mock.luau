@@ -78,6 +78,9 @@ noctalia = {
   fileExists = function(path)
     return H.files[path] == true or H.written[path] ~= nil
   end,
+  getenv = function(name)
+    return ({ HOME = "/home/test" })[name]
+  end,
   expandPath = function(p)
     return (string.gsub(p, "^~", "/home/test"))
   end,
@@ -320,6 +323,25 @@ function H.find(tree, pred, out)
     H.find(c, pred, out)
   end
   return out
+end
+
+-- visibleText concatenates text that is NOT inside a ui.scroll: what the user
+-- sees without scrolling (pinned header, cards and footer).
+function H.visibleText(tree)
+  local parts = {}
+  local function walk(n)
+    if n.type == "scroll" then
+      return
+    end
+    if n.props.text ~= nil then
+      table.insert(parts, tostring(n.props.text))
+    end
+    for _, c in ipairs(n.children or {}) do
+      walk(c)
+    end
+  end
+  walk(tree)
+  return table.concat(parts, "\n")
 end
 
 -- text concatenates every label/button text in the tree.

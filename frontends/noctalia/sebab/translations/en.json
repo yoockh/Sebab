@@ -82,7 +82,9 @@
     "busy_secret": "Preparing a secure handoff...",
     "recent": "Latency of the last {n} checks (red: failed)",
     "mute": "Mute notifications",
-    "unmute": "Unmute notifications"
+    "unmute": "Unmute notifications",
+    "saved_to": "Saved to {path}",
+    "exit_code": "sebab exited with code {code}"
   },
   "form": {
     "add_title": "Add monitor",
@@ -120,7 +122,10 @@
     "err_expect": "\"{code}\" is not an HTTP status code.",
     "err_header": "Enter the header name, for example X-API-Key.",
     "err_username": "Enter the user name.",
-    "err_token": "Enter the secret."
+    "err_token": "Enter the secret.",
+    "save_failed": "Could not save the monitor.",
+    "test_failed": "The test could not run.",
+    "timed_out": "The sebab command timed out. Is the engine stuck? Try again, or run \"sebab doctor\"."
   },
   "confirm": {
     "title": "Delete monitor",

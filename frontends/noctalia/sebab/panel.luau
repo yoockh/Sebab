@@ -80,6 +80,54 @@ local function decode(s)
   return nil
 end
 
+-- firstLine returns the first non-empty line of CLI output without the
+-- "sebab: " prefix.
+local function firstLine(text)
+  for line in string.gmatch(text or "", "[^\n]+") do
+    line = trim(line)
+    if line ~= "" then
+      return (string.gsub(line, "^sebab: ", ""))
+    end
+  end
+  return ""
+end
+
+-- failure explains a failed command: a short human reason, then the CLI's
+-- own first line (validation errors from --json output, else stderr).
+local function failure(res, reasonKey)
+  if res.timedOut then
+    return { tr("form.timed_out") }
+  end
+  local out = decode(res.stdout)
+  local detail = ""
+  if out ~= nil and type(out.errors) == "table" and #out.errors > 0 then
+    detail = tostring(out.errors[1])
+  else
+    detail = firstLine(res.stderr)
+  end
+  if detail == "" then
+    detail = tr("panel.exit_code", { code = res.exitCode })
+  end
+  return { tr(reasonKey), detail }
+end
+
+-- configPathDisplay is where saves go, with the home directory shown as ~.
+local function configPathDisplay()
+  local home = noctalia.getenv("HOME") or ""
+  local path = noctalia.getenv("SEBAB_CONFIG")
+  if path == nil or path == "" then
+    local base = noctalia.getenv("XDG_CONFIG_HOME")
+    if base == nil or base == "" then
+      base = home .. "/.config"
+    end
+    path = base .. "/sebab/config.toml"
+  end
+  if home ~= "" and string.sub(path, 1, #home) == home then
+    path = "~" .. string.sub(path, #home + 1)
+  end
+  return path
+end
+
 local function cliErrors(res)
   local out = decode(res.stdout)
   if out ~= nil and type(out.errors) == "table" and #out.errors > 0 then
@@ -247,7 +295,7 @@ local function runTest()
     run(argv, tr("panel.busy_test"), 30000, function(res)
       local ev = decode(res.stdout)
       if ev == nil or ev.type ~= "check" then
-        formErrors = cliErrors(res)
+        formErrors = failure(res, "form.test_failed")
         testResult = nil
         return
       end
@@ -286,13 +334,16 @@ local function save()
     run(argv, tr("panel.busy_save"), 15000, function(res)
       local out = decode(res.stdout)
       if res.exitCode ~= 0 or out == nil or out.ok ~= true then
-        formErrors = cliErrors(res)
+        formErrors = failure(res, "form.save_failed")
         return
       end
       if path ~= nil then
         handoffPath = nil -- consumed and deleted by the engine
       end
-      toast = out.warning or tr("panel.saved", { name = trim(form.name) })
+      toast = tr("panel.saved", { name = trim(form.name) }) .. "\n" .. tr("panel.saved_to", { path = configPathDisplay() })
+      if out.warning ~= nil then
+        toast = toast .. "\n" .. out.warning
+      end
       form, testResult, formErrors, view = nil, nil, {}, "list"
     end)
   end)
@@ -601,14 +652,17 @@ local function formView()
     ui.toggle({ checked = f.insecure, onChange = function(v) f.insecure = v == "true"; testResult = nil; render() end }),
     ui.label({ text = tr("form.insecure"), flexGrow = 1, maxLines = 2, color = f.insecure and "error" or "on_surface" }),
   }))
+  -- Feedback lives outside the scroll so it is always visible (item 7).
+  local feedback = {}
   for _, e in ipairs(formErrors) do
-    table.insert(fields, ui.label({ text = e, color = "error", fontSize = 12, maxLines = 4 }))
+    table.insert(feedback, ui.label({ text = e, color = "error", fontSize = 12, maxLines = 4 }))
   end
-  table.insert(fields, testView())
+  table.insert(feedback, testView())
   local title = f.mode == "add" and tr("form.add_title") or tr("form.edit_title", { name = f.name })
   return ui.column({ flexGrow = 1, gap = 10 }, {
     header(title),
     ui.scroll({ flexGrow = 1, gap = 10 }, fields),
+    ui.column({ gap = 4 }, feedback),
     ui.row({ gap = 8, justify = "end" }, {
       ui.button({ text = tr("form.cancel"), variant = "ghost", onClick = cancelForm }),
       ui.button({ text = tr("form.test"), glyph = "flask", variant = "secondary", enabled = busy == nil, onClick = runTest }),
@@ -665,12 +719,25 @@ function onOpen(context)
   render()
 end
 
--- `noctalia msg plugin yoockh/sebab:panel all add` opens the add form while the
--- panel is open; `noctalia msg panel-open yoockh/sebab:panel add` opens it directly.
-function onIpc(event, _payload)
+-- Panel IPC, for keybinds and scripted checks (the panel must be open):
+--   noctalia msg plugin yoockh/sebab:panel all add [url-or-host:port]
+--   noctalia msg plugin yoockh/sebab:panel all test | save | cancel
+-- `noctalia msg panel-open yoockh/sebab:panel add` opens the add form directly.
+function onIpc(event, payload)
   if event == "add" then
     openAdd()
-  elseif event == "list" then
+    if payload ~= nil and trim(payload) ~= "" then
+      form.target = trim(payload)
+      form.name = string.match(form.target, "^%a+://([^/:]+)") or string.match(form.target, "^([^:/]+)") or form.target
+      formSerial += 1
+      form.serial = formSerial -- fresh input keys so the seeded values show
+      render()
+    end
+  elseif view == "form" and form ~= nil and event == "test" then
+    runTest()
+  elseif view == "form" and form ~= nil and event == "save" then
+    save()
+  elseif event == "cancel" or event == "list" then
     cancelForm()
   end
 end

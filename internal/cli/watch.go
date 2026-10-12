@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -136,13 +137,23 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 		opts.NoJitter = true
 	}
 	eng := engine.New(cfg, opts)
+	// problem is the current config error, replayed to frontends that attach
+	// later (the startup error event is long gone by then).
+	var problem atomic.Pointer[event.Error]
+	problem.Store(cfgErr)
 	reload := func() error {
 		c, err := config.Load(rt.paths.ConfigFile)
 		if errors.Is(err, config.ErrNotFound) {
+			_, missing := loadForEngine(rt)
+			problem.Store(missing)
 			c, err = &config.Config{}, nil
+		} else if err == nil {
+			problem.Store(nil)
 		}
 		if err != nil {
-			sinks.Emit(event.NewError(time.Now(), event.ErrConfigInvalid, rt.redactor.Scrub(err.Error())))
+			ev := event.NewError(time.Now(), event.ErrConfigInvalid, rt.redactor.Scrub(err.Error()))
+			problem.Store(&ev)
+			sinks.Emit(ev)
 			return err
 		}
 		dispatch.Configure(c.Notify)
@@ -155,7 +166,7 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 	defer cancel()
 	if sock != "" {
 		srv := &server.Server{Path: sock, Events: bc, Scrub: rt.redactor, Version: versionString(), Source: source,
-			Backend: &engineBackend{eng: eng, reload: reload, red: rt.redactor, hist: opts.History}}
+			Backend: &engineBackend{eng: eng, reload: reload, red: rt.redactor, hist: opts.History, problem: &problem}}
 		if err := srv.Listen(); err == nil {
 			wg.Add(1)
 			go func() { defer wg.Done(); srv.Serve(ctx) }()
@@ -209,15 +220,24 @@ func (m multiSink) Emit(ev any) {
 
 // engineBackend adapts the engine to the socket server.
 type engineBackend struct {
-	eng    *engine.Engine
-	reload func() error
-	red    *secret.Redactor
-	hist   engine.History
+	eng     *engine.Engine
+	reload  func() error
+	red     *secret.Redactor
+	hist    engine.History
+	problem *atomic.Pointer[event.Error]
 }
 
-func (b *engineBackend) Snapshot(ctx context.Context) []any { return b.eng.Snapshot(ctx) }
-func (b *engineBackend) Trigger(id string)                  { b.eng.Trigger(id) }
-func (b *engineBackend) Reload() error                      { return b.reload() }
+func (b *engineBackend) Snapshot(ctx context.Context) []any {
+	evs := b.eng.Snapshot(ctx)
+	if b.problem != nil {
+		if p := b.problem.Load(); p != nil {
+			evs = append(evs, *p)
+		}
+	}
+	return evs
+}
+func (b *engineBackend) Trigger(id string) { b.eng.Trigger(id) }
+func (b *engineBackend) Reload() error     { return b.reload() }
 
 func (b *engineBackend) Report(ctx context.Context, id string) (string, error) {
 	ev, ok := b.eng.LastCheck(ctx, id)

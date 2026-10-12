@@ -173,6 +173,10 @@ local function onLine(line: string)
     end
   elseif t == "monitors" then
     applyMonitors(ev.monitors)
+    -- A (re)loaded config resolves an earlier "missing/invalid config" error.
+    if lastError ~= nil and (lastError.code == "CONFIG_MISSING" or lastError.code == "CONFIG_INVALID") then
+      lastError = nil
+    end
   elseif t == "check" then
     applyCheck(ev)
     if ev.notify and freshCheckAlert(ev) then

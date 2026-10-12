@@ -172,3 +172,34 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   binary and its build time for a dataset that is append-only, small (about 1.5 MB per day for 20 monitors at 60 s)
   and only read sequentially. JSONL needs no dependency and stays greppable.
 - **Alternatives:** modernc.org/sqlite; mattn/go-sqlite3 (needs CGO, breaks the static binary); bbolt.
+
+## D23. Save in the panel: root cause and fix
+
+- **What happened:** the owner pressed the panel's primary button ("Test, then save") and saw nothing. Evidence:
+  `~/.config/sebab/` existed (created by the engine's config watcher) but held no `config.toml`, no handoff
+  directory existed, and the Noctalia log showed no Luau errors. Replaying the panel's exact argv for `check` and
+  `monitor add` in the plugin's environment (same HOME, no XDG_CONFIG_HOME, binary found through the dev path)
+  worked and created `config.toml` from nothing, so the CLI, the environment (e) and first-run file creation (b)
+  were fine. In Noctalia's v5.2.1 source, input `onChange` fires only on real edits and closure handlers keep
+  stable path-derived names, so clicks did reach the script.
+- **Root cause:** the form rendered every piece of feedback (the test result, validation errors and CLI errors) at
+  the end of the scrollable field list, below the fold. With the two-step flow (D20) the first click only ran a
+  test whose result was invisible, and a validation error such as "missing port" was invisible too, so pressing
+  the button looked like a no-op and the owner closed the panel, which discards the draft. `monitor add` never ran.
+- **Fix:** feedback moved to a pinned area outside the scroll (see D26, D27 for the full layout); failures show a
+  short human reason plus the CLI's first stderr line (or the first `--json` error), timeouts are reported, and a
+  successful save shows "Saved to ~/.config/sebab/config.toml" (home shown as `~`, honouring SEBAB_CONFIG and
+  XDG_CONFIG_HOME). Proof: `frontends/noctalia/testdata/panel_save_test.luau` (failed before the fix) and
+  `internal/cli` TestPanelSavePathPersistsAcrossDaemonRestart (daemon on a temp XDG dir, the panel's argv, file
+  content and 0600/0700 modes, restart, monitor still listed).
+- **Also fixed on the way:** (c) a frontend that attached after engine start never learned about `CONFIG_MISSING`
+  or `CONFIG_INVALID` (the error event was emitted once at startup); the engine now replays the current config
+  problem in every snapshot. The plugin kept a stale "no config yet" banner after the first save; the service now
+  clears config errors when a new `monitors` event arrives. (d) the list was already driven by engine state.
+
+## D24. Panel IPC for keybinds and scripted checks
+
+- **What:** the panel accepts `add [url-or-host:port]` (opens the form, prefilled), `test`, `save` and `cancel`
+  over `noctalia msg plugin yoockh/sebab:panel all <event>`, driving exactly the same code as the buttons.
+- **Why:** lets a keybind open "add this URL", and lets the real-shell verification reach the result and error
+  states: no Wayland input injection tool (wtype, ydotool) is installed and installing one needs root.
