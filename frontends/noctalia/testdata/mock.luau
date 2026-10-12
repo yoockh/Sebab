@@ -216,6 +216,7 @@ local ALLOWED = {
     "frameVisible", "focus", "enabled", "onChange", "onSubmit" }),
   select = with({ "options", "selectedIndex", "placeholder", "controlSize", "enabled", "onChange" }),
   toggle = with({ "checked", "enabled", "onChange" }),
+  markdown = with({ "text" }),
   graph = with({ "values", "values2", "color", "color2", "lineWidth", "fillOpacity", "onPointerMove", "onPointerLeave" }),
 }
 local CALLBACKS = { onClick = 1, onHover = 1, onChange = 1, onSubmit = 1, onRightClick = 1, onScroll = 1,

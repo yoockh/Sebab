@@ -77,6 +77,8 @@ func TestPanelResultCard(t *testing.T) { run(t, "panel.luau", "panel_card_test.l
 
 func TestPanelCloseClearsSecret(t *testing.T) { run(t, "panel.luau", "panel_close_test.luau", "") }
 
+func TestPanelHelp(t *testing.T) { run(t, "panel.luau", "panel_help_test.luau", "") }
+
 // Every translation key used by the scripts and the manifest exists in en.json.
 func TestTranslationsComplete(t *testing.T) {
 	var nested map[string]any
@@ -120,6 +122,18 @@ func TestTranslationsComplete(t *testing.T) {
 	for _, s := range []string{"up", "degraded", "down", "unknown", "paused"} {
 		if _, ok := en["status."+s]; !ok {
 			missing = append(missing, "status."+s)
+		}
+	}
+	for _, s := range []string{"intro", "add", "layers", "side", "tokens", "config"} {
+		for _, part := range []string{"_title", "_body"} {
+			if _, ok := en["help."+s+part]; !ok {
+				missing = append(missing, "help."+s+part)
+			}
+		}
+	}
+	for _, s := range []string{"name", "target", "expect", "interval", "auth", "header", "username", "token", "vpn"} {
+		if _, ok := en["fieldhelp."+s]; !ok {
+			missing = append(missing, "fieldhelp."+s)
 		}
 	}
 	for _, s := range []string{"ok", "fail", "none", "skip"} {

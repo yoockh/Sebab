@@ -546,13 +546,20 @@ local function summaryText(s)
   return table.concat(parts, " · ")
 end
 
-local function header(title, extra)
+local openHelp -- forward declaration
+
+-- header: title, view actions, the help "i" button and close (D30).
+local function header(title, extra, noHelp)
   local items = { ui.label({ text = title, fontSize = 16, fontWeight = "bold", flexGrow = 1 }) }
   for _, b in ipairs(extra or {}) do
     table.insert(items, b)
   end
+  if not noHelp then
+    table.insert(items, ui.button({ key = "help-button", glyph = "info-circle", variant = "ghost",
+      tooltip = tr("help.open"), onClick = function() openHelp() end }))
+  end
   table.insert(items, ui.button({ glyph = "close", variant = "ghost", onClick = function() panel.close() end }))
-  return ui.row({ gap = 6, align = "center" }, items)
+  return ui.row({ key = "header", gap = 6, align = "center" }, items)
 end
 
 -- statusLine is the transient busy/toast line, or nil.
@@ -608,8 +615,14 @@ local function listView()
   }), "list-scroll", body, { statusLine(), n = 1 })
 end
 
-local function field(label, control)
-  return ui.column({ gap = 4 }, { muted(label), control })
+-- field is a labelled control with a one-line helper text under it (D30).
+local function field(label, control, helpKey)
+  local children = { muted(label), control }
+  if helpKey ~= nil then
+    table.insert(children, ui.label({ key = "help-" .. helpKey, text = tr("fieldhelp." .. helpKey), fontSize = 11,
+      color = "on_surface_variant", maxLines = 2 }))
+  end
+  return ui.column({ gap = 4 }, children)
 end
 
 local function input(name, value, placeholder, onChange, password)
@@ -723,34 +736,30 @@ local function formView()
   local f = form
   local auth = AUTH_TYPES[f.authIndex + 1]
   local fields = {
-    field(tr("form.name"), input("name", f.name, tr("form.name_hint"), function(v) f.name = v end)),
-    field(tr("form.target"), input("target", f.target, tr("form.target_hint"), function(v) f.target = v end)),
-    ui.row({ gap = 8 }, {
-      ui.column({ flexGrow = 1, gap = 4 }, { muted(tr("form.interval")),
-        input("interval", f.interval, "60", function(v) f.interval = v end) }),
-      ui.column({ flexGrow = 1, gap = 4 }, { muted(tr("form.expect")),
-        input("expect", f.expect, tr("form.expect_hint"), function(v) f.expect = v end) }),
-    }),
+    field(tr("form.name"), input("name", f.name, tr("form.name_hint"), function(v) f.name = v end), "name"),
+    field(tr("form.target"), input("target", f.target, tr("form.target_hint"), function(v) f.target = v end), "target"),
+    field(tr("form.expect"), input("expect", f.expect, tr("form.expect_hint"), function(v) f.expect = v end), "expect"),
+    field(tr("form.interval"), input("interval", f.interval, "60", function(v) f.interval = v end), "interval"),
     field(tr("form.auth"), ui.select({ options = { tr("form.auth_none"), tr("form.auth_bearer"), tr("form.auth_header"),
       tr("form.auth_basic") }, selectedIndex = f.authIndex, controlSize = "sm", onChange = function(index)
         f.authIndex = tonumber(index) or 0
         testResult = nil
         render()
-      end })),
+      end }), "auth"),
   }
   if auth == "header" then
-    table.insert(fields, field(tr("form.header_name"), input("header", f.header, "X-API-Key", function(v) f.header = v end)))
+    table.insert(fields, field(tr("form.header_name"), input("header", f.header, "X-API-Key", function(v) f.header = v end), "header"))
   elseif auth == "basic" then
-    table.insert(fields, field(tr("form.username"), input("username", f.username, "", function(v) f.username = v end)))
+    table.insert(fields, field(tr("form.username"), input("username", f.username, "", function(v) f.username = v end), "username"))
   end
   if auth ~= "" then
     local hint = tr("form.token_hint")
     if f.secretRef ~= nil and f.authIndex == f.hadAuthIndex then
       hint = tr("form.token_keep", { name = f.secretRef })
     end
-    table.insert(fields, field(tr("form.token"), input("token", "", hint, function(v) f.token = v end, true)))
+    table.insert(fields, field(tr("form.token"), input("token", "", hint, function(v) f.token = v end, true), "token"))
   end
-  table.insert(fields, field(tr("form.vpn"), input("vpn", f.vpn, tr("form.vpn_hint"), function(v) f.vpn = v end)))
+  table.insert(fields, field(tr("form.vpn"), input("vpn", f.vpn, tr("form.vpn_hint"), function(v) f.vpn = v end), "vpn"))
   table.insert(fields, ui.row({ gap = 8, align = "center" }, {
     ui.toggle({ checked = f.insecure, onChange = function(v) f.insecure = v == "true"; testResult = nil; render() end }),
     ui.label({ text = tr("form.insecure"), flexGrow = 1, maxLines = 2, color = f.insecure and "error" or "on_surface" }),
@@ -764,6 +773,32 @@ local function formView()
   })
   -- The result card replaces the busy line while the form is open (D27).
   return frame(header(title), "form-scroll", fields, { resultCard(), buttons, n = 2 })
+end
+
+-- Help view (D30). Back returns to the view the user came from, form draft intact.
+local helpReturn = "list"
+
+openHelp = function()
+  if view ~= "help" then
+    helpReturn = view
+  end
+  view = "help"
+  render()
+end
+
+local function helpView()
+  local sections = { "intro", "add", "layers", "side", "tokens" }
+  local md = {}
+  for _, key in ipairs(sections) do
+    table.insert(md, "### " .. tr("help." .. key .. "_title"))
+    table.insert(md, tr("help." .. key .. "_body"))
+  end
+  table.insert(md, "### " .. tr("help.config_title"))
+  table.insert(md, tr("help.config_body", { path = configPathDisplay() }))
+  local back = ui.button({ key = "help-back", glyph = "arrow-back-up", text = tr("help.back"), variant = "ghost",
+    onClick = function() view = helpReturn; render() end })
+  return frame(header(tr("help.title"), { back }, true), "help-scroll",
+    { ui.markdown({ key = "help-text", text = table.concat(md, "\n\n") }) }, { n = 0 })
 end
 
 local function confirmView()
@@ -790,6 +825,8 @@ render = function()
     panel.render(formView())
   elseif view == "confirm" then
     panel.render(confirmView())
+  elseif view == "help" then
+    panel.render(helpView())
   else
     panel.render(listView())
   end
@@ -818,7 +855,9 @@ end
 --   noctalia msg plugin yoockh/sebab:panel all test | save | cancel
 -- `noctalia msg panel-open yoockh/sebab:panel add` opens the add form directly.
 function onIpc(event, payload)
-  if event == "add" then
+  if event == "help" then
+    openHelp()
+  elseif event == "add" then
     openAdd()
     if payload ~= nil and trim(payload) ~= "" then
       form.target = trim(payload)

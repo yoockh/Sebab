@@ -146,5 +146,33 @@
     "layer_none": "not run",
     "layer_skip": "skipped",
     "no_dns": "no lookup"
+  },
+  "fieldhelp": {
+    "name": "A label you will recognise in the bar, notifications and reports.",
+    "target": "A full URL (http:// or https://) for web services, or host:port for anything else, for example db.example.com:5432.",
+    "expect": "HTTP status codes that count as healthy, comma separated. Leave empty to accept any 2xx.",
+    "interval": "How often to check, in seconds. 60 is a good default; 30 is the minimum.",
+    "auth": "How the endpoint expects credentials. Choose None for public health checks.",
+    "header": "The header that carries the key, for example X-API-Key.",
+    "username": "The user name for basic auth; the password goes in Secret below.",
+    "token": "Stored in your keyring (or a private 0600 file), never in config.toml. Wiped when the panel closes.",
+    "vpn": "Only check while this network interface is up, for example wg0 or tun0. Leave empty if no VPN is needed."
+  },
+  "help": {
+    "open": "Help",
+    "title": "How Sebab works",
+    "back": "Back",
+    "intro_title": "What Sebab does",
+    "intro_body": "Sebab checks your services from this machine, layer by layer, and tells you which layer failed. It also tells you whether the problem is on your side (your network, VPN or token) or on theirs.",
+    "add_title": "Add a monitor",
+    "add_body": "1. Press + in the list.\n2. Enter a name and a URL (or host:port).\n3. Optionally set expected status codes, the interval, authentication and a VPN interface.\n4. Press Test, then save: the result card shows which layer answered and which failed.\n5. Press Save. The monitor appears in the list and is checked from now on.",
+    "layers_title": "The layers",
+    "layers_body": "- **Local**: your machine has a network link and a route out.\n- **VPN**: the VPN interface the monitor needs is up.\n- **DNS**: the name resolves to an address.\n- **TCP**: something accepts connections on the port.\n- **TLS**: the certificate is valid, trusted and covers the name.\n- **HTTP**: the server answers with an expected status, in time.",
+    "side_title": "Your side or their side",
+    "side_body": "After a failure Sebab also checks a few well-known internet targets. If those fail too, the problem is on your side (Wi-Fi, router, VPN, DNS) and you get one \"you are offline\" message instead of one alert per monitor. If they work, the service itself is at fault: their side. A rejected token counts as your side.",
+    "tokens_title": "Tokens and passwords",
+    "tokens_body": "Secrets go to the system keyring (Secret Service: GNOME Keyring, KWallet or KeePassXC). Without a keyring Sebab uses a private 0600 file and warns you. The config only holds a reference, and secrets never appear in notifications, logs or copied reports.",
+    "config_title": "Where things are stored",
+    "config_body": "Monitors live in {path}. Every Sebab frontend (this panel, Waybar, the CLI) reads the same file. Run \"sebab doctor\" in a terminal if something seems missing."
   }
 }

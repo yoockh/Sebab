@@ -259,3 +259,12 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   mitigation above protects them better (they are wiped on close instead of the panel refusing to close).
 - **Proof:** `panel_close_test.luau` (token gone from files, argv and the form after close; draft restored).
   The outside click itself must be checked by a human (no input injection is available here, TESTING.md).
+
+## D30. Help view and field hints
+
+- **What:** an "i" button (`info-circle`) next to the close X opens a help view (`ui.markdown`, API 21): what
+  Sebab does, how to add a monitor, what each layer means, your side vs their side, how secrets are stored, and
+  where the config file lives (path shown with `~`). Back returns to the view the user came from with the form
+  draft intact. Every form field has a one-line hint under it (`fieldhelp.*`). Interval and expected status
+  became full-width fields so their hints fit. All strings are nested keys in `translations/en.json`; the help
+  can also be opened with the panel IPC event `help`.
