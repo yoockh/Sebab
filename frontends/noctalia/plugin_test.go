@@ -75,6 +75,8 @@ func TestPanelLayout(t *testing.T) { run(t, "panel.luau", "panel_layout_test.lua
 
 func TestPanelResultCard(t *testing.T) { run(t, "panel.luau", "panel_card_test.luau", "") }
 
+func TestPanelCloseClearsSecret(t *testing.T) { run(t, "panel.luau", "panel_close_test.luau", "") }
+
 // Every translation key used by the scripts and the manifest exists in en.json.
 func TestTranslationsComplete(t *testing.T) {
 	var nested map[string]any

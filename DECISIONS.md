@@ -154,6 +154,8 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
 - **What:** the first "Test, then save" click runs `sebab check --json` with the form values and shows the result;
   the second click saves. Changing any field invalidates the test. The panel does not dismiss on outside clicks
   (`dismiss_on_outside_click = false`, as the Noctalia docs recommend for panels with secret inputs).
+- **Update:** the `dismiss_on_outside_click = false` part is reversed by D29; the two-click test-then-save part is
+  kept and re-confirmed in D28.
 
 ## D21. Plugin finds a development binary
 
@@ -242,3 +244,18 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   failed save stays on the form with the error in the result card (D27). Cancel discards the draft.
 - **D20's two-step flow stays:** the first click tests, the second saves. It no longer conflicts with usability
   because the result is now always visible (D27), and it keeps the PRD's "test before save" guarantee (Story 1).
+
+## D29. Panel closes on outside click; drafts survive, secrets never do (reverses part of D20)
+
+- **What:** `dismiss_on_outside_click = true`. Closing (outside click, Escape, X) keeps the non-secret draft in
+  panel memory and reopens it; the token, its handoff file and any test result that used the token are discarded
+  on every close, and the inputs get fresh keys so the masked field is rebuilt empty. Drafts are never written
+  to disk. Cancel still discards the whole draft.
+- **Why:** the owner reported that the panel only closed with X and blocked other widgets and windows. Noctalia
+  v5.2.1 source (`src/shell/panel/panel_manager.cpp`, `resolvePanelKeyboardPlan`): on a compositor with focus-grab
+  support (Hyprland) a panel that does not dismiss on outside clicks keeps an exclusive keyboard grab for as long
+  as it is open; with outside dismissal Noctalia creates a focus grab, relaxes the keyboard to on-demand, and
+  closes the panel when a click elsewhere clears the grab. D20 chose `false` to protect typed secrets; the
+  mitigation above protects them better (they are wiped on close instead of the panel refusing to close).
+- **Proof:** `panel_close_test.luau` (token gone from files, argv and the form after close; draft restored).
+  The outside click itself must be checked by a human (no input injection is available here, TESTING.md).

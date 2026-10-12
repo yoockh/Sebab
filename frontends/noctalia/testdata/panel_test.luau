@@ -202,7 +202,8 @@ H.assert(removed, "unsaved handoff file must be deleted on close")
 -- The token never appears in any process argument.
 H.assert(string.find(allArgs(), TOKEN, 1, true) == nil, "token leaked into argv")
 
--- Engine missing banner.
+-- Engine missing banner (cancel the kept draft first: a close keeps it, D29).
+onIpc("cancel", nil)
 noctalia.state.set("sebab", { engine = "missing", monitors = {} })
 onOpen(nil)
 H.contains(H.text(H.rendered), "panel.missing_binary")

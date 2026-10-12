@@ -54,4 +54,4 @@ height                   = 720
 placement                = "attached"
 position                 = "auto"
 open_near_click          = true
-dismiss_on_outside_click = false
+dismiss_on_outside_click = true

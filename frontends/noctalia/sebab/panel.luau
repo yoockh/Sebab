@@ -805,7 +805,8 @@ end)
 function onOpen(context)
   snapshot = noctalia.state.get(common.STATE_KEY)
   toast = nil
-  if context == "add" then
+  -- A draft kept from an outside-click close reopens as it was (D29).
+  if context == "add" and not (view == "form" and form ~= nil and form.mode == "add") then
     openAdd()
     return
   end
@@ -853,13 +854,21 @@ function update()
   end
 end
 
+-- The panel closes on outside clicks (D29), so a stray click must not lose the
+-- draft: everything typed is kept, except the secret. The token, its handoff
+-- file and a test result that used it are always discarded on close, and the
+-- inputs get fresh keys so the masked field is rebuilt empty.
 function onClose()
-  -- Never leave a typed token behind.
   dropHandoff()
   if form ~= nil then
     form.token = ""
+    formSerial += 1
+    form.serial = formSerial
+    if AUTH_TYPES[form.authIndex + 1] ~= "" then
+      testResult = nil
+    end
   end
-  form, testResult, formErrors, view = nil, nil, {}, "list"
+  formErrors = {}
 end
 
 function onExit(_signal, _reason)
