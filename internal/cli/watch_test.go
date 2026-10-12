@@ -78,12 +78,13 @@ func (m *memKeyring) Delete(s, u string) error {
 
 // world is an isolated environment: temp XDG dirs, the failure lab, a fake keyring.
 type world struct {
-	t       *testing.T
-	lab     *lab.Lab
-	vars    map[string]string
-	keyring *memKeyring
-	outputs []*syncBuffer // every stdout/stderr ever produced, for leak checks
-	mu      sync.Mutex
+	notified []string // titles sent through the desktop notifier
+	t        *testing.T
+	lab      *lab.Lab
+	vars     map[string]string
+	keyring  *memKeyring
+	outputs  []*syncBuffer // every stdout/stderr ever produced, for leak checks
+	mu       sync.Mutex
 }
 
 func newWorld(t *testing.T) *world {
@@ -123,8 +124,22 @@ func (w *world) env(stdin string) (Env, *syncBuffer, *syncBuffer) {
 	return Env{Stdin: strings.NewReader(stdin), Stdout: out, Stderr: errOut,
 		Getenv: func(k string) string { return w.vars[k] },
 		hooks: &hooks{network: platform.Online(), dialer: w.lab.Dialer, keyring: w.keyring,
+			noSleepWatch: true, notify: w.recordNotify,
 			canary:  []string{"tcp://127.0.0.1:" + strconv.Itoa(w.lab.HTTPPort)},
 			dnsName: []string{"canary.lab.test"}}}, out, errOut
+}
+
+func (w *world) recordNotify(_ context.Context, title, body, _ string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.notified = append(w.notified, title+": "+body)
+	return nil
+}
+
+func (w *world) notifications() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return append([]string(nil), w.notified...)
 }
 
 func (w *world) run(stdin string, args ...string) (int, string, string) {
@@ -174,6 +189,7 @@ type watcher struct {
 	out    *syncBuffer
 	cancel context.CancelFunc
 	done   chan int
+	once   sync.Once
 }
 
 func (w *world) startWatch(args ...string) *watcher {
@@ -186,12 +202,14 @@ func (w *world) startWatch(args ...string) *watcher {
 }
 
 func (wt *watcher) stop(t *testing.T) {
-	wt.cancel()
-	select {
-	case <-wt.done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("watch did not stop")
-	}
+	wt.once.Do(func() {
+		wt.cancel()
+		select {
+		case <-wt.done:
+		case <-time.After(5 * time.Second):
+			t.Error("watch did not stop")
+		}
+	})
 }
 
 // events parses the watch output so far.

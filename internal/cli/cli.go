@@ -47,6 +47,7 @@ func commands() map[string]command {
 		"monitor":      {"add, list, show, edit, rm, pause or resume monitors", runMonitor},
 		"secret":       {"set, rm, list secrets (values only via stdin) or create a handoff file", runSecret},
 		"watch":        {"stream engine events as JSON lines (attaches to a running engine)", runWatch},
+		"daemon":       {"run the shared engine in the background (systemd user service)", runDaemon},
 		"doctor":       {"explain what is missing (keyring, notifications, network, engine)", runDoctor},
 		"refresh":      {"ask the running engine to check now (all monitors, or one id)", runRefresh},
 		"report":       {"print a redacted Markdown diagnosis for a monitor", runReport},

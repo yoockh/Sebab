@@ -1,0 +1,29 @@
+# Sebab engine as a systemd user service. One engine serves every frontend
+# (Noctalia, Waybar, CLI) through $XDG_RUNTIME_DIR/sebab/sebab.sock.
+#
+#   systemctl --user enable --now sebab.service
+#
+# Frontends started with `sebab watch` attach to it automatically.
+
+[Unit]
+Description=Sebab endpoint monitor engine
+Documentation=https://github.com/yoockh/sebab
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sebab daemon
+Restart=on-failure
+RestartSec=5
+# The engine only needs its config, the runtime socket and the network.
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=graphical-session.target

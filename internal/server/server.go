@@ -25,6 +25,9 @@ import (
 type Request struct {
 	Cmd     string `json:"cmd"` // subscribe, check, reload, report, status, ping
 	Monitor string `json:"monitor,omitempty"`
+	// Notifications, on subscribe, says the client displays notifications
+	// itself, so the engine must not send its own desktop notifications.
+	Notifications bool `json:"notifications,omitempty"`
 }
 
 // Response answers non-streaming commands.
@@ -49,13 +52,26 @@ type Backend interface {
 // Slow subscribers are dropped rather than blocking the engine.
 type Broadcaster struct {
 	mu    sync.Mutex
-	subs  map[chan []byte]struct{}
+	subs  map[chan []byte]bool // value: the subscriber displays notifications
 	scrub event.Scrubber
 }
 
 // NewBroadcaster returns a broadcaster that scrubs every line with scrub.
 func NewBroadcaster(scrub event.Scrubber) *Broadcaster {
-	return &Broadcaster{subs: map[chan []byte]struct{}{}, scrub: scrub}
+	return &Broadcaster{subs: map[chan []byte]bool{}, scrub: scrub}
+}
+
+// HasNotifyingSubscriber reports whether an attached frontend displays
+// notifications (then the engine must not send its own).
+func (b *Broadcaster) HasNotifyingSubscriber() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, notifies := range b.subs {
+		if notifies {
+			return true
+		}
+	}
+	return false
 }
 
 // Emit implements engine.Sink.
@@ -76,10 +92,10 @@ func (b *Broadcaster) Emit(ev any) {
 	}
 }
 
-func (b *Broadcaster) subscribe() chan []byte {
+func (b *Broadcaster) subscribe(notifies bool) chan []byte {
 	ch := make(chan []byte, 256)
 	b.mu.Lock()
-	b.subs[ch] = struct{}{}
+	b.subs[ch] = notifies
 	b.mu.Unlock()
 	return ch
 }
@@ -172,7 +188,7 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	}
 	switch req.Cmd {
 	case "subscribe":
-		s.stream(ctx, conn)
+		s.stream(ctx, conn, req.Notifications)
 	case "check":
 		s.Backend.Trigger(req.Monitor)
 		s.reply(conn, Response{OK: true})
@@ -206,8 +222,8 @@ func (s *Server) reply(conn net.Conn, r Response) {
 }
 
 // stream sends the snapshot, then live events, until the client goes away.
-func (s *Server) stream(ctx context.Context, conn net.Conn) {
-	ch := s.Events.subscribe()
+func (s *Server) stream(ctx context.Context, conn net.Conn, notifies bool) {
+	ch := s.Events.subscribe(notifies)
 	defer s.Events.unsubscribe(ch)
 	w := bufio.NewWriter(conn)
 	write := func(line []byte) bool {
@@ -301,8 +317,9 @@ func Call(ctx context.Context, path string, req Request, timeout time.Duration) 
 }
 
 // Subscribe connects and copies the event stream to w until ctx ends or the
-// connection drops.
-func Subscribe(ctx context.Context, path string, w io.Writer) error {
+// connection drops. notifies tells the engine that the caller displays
+// notifications itself.
+func Subscribe(ctx context.Context, path string, w io.Writer, notifies bool) error {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
@@ -313,7 +330,8 @@ func Subscribe(ctx context.Context, path string, w io.Writer) error {
 		<-ctx.Done()
 		conn.Close()
 	}()
-	if _, err := conn.Write([]byte(`{"cmd":"subscribe"}` + "\n")); err != nil {
+	req, _ := json.Marshal(Request{Cmd: "subscribe", Notifications: notifies})
+	if _, err := conn.Write(append(req, '\n')); err != nil {
 		return fmt.Errorf("subscribe: %w", err)
 	}
 	_, err = io.Copy(w, conn)

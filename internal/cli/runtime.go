@@ -24,6 +24,9 @@ type hooks struct {
 	dnsName []string // overrides the configured DNS canary names
 	clock   engine.Clock
 	jitter  bool // keep first-check jitter (default off in tests)
+	notify  notifyFunc
+	// noSleepWatch skips the logind watcher (tests never touch the system bus).
+	noSleepWatch bool
 }
 
 // runtime is the shared wiring for commands that probe or touch secrets.

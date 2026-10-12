@@ -30,6 +30,8 @@ func runWatch(ctx context.Context, env Env, args []string) int {
 	format := fs.String("format", "jsonl", "output format: jsonl")
 	session := fs.String("session", "", "session token, so 'sebab kill-session' can stop this process")
 	embedded := fs.Bool("embedded", false, "always run an embedded engine, never attach to a daemon")
+	frontendNotifies := fs.Bool("frontend-notifies", true,
+		"the program reading this stream displays notifications (false: the engine sends desktop notifications)")
 	if code, ok := parseFlags(fs, args); !ok {
 		return code
 	}
@@ -53,12 +55,32 @@ func runWatch(ctx context.Context, env Env, args []string) int {
 	sock := rt.paths.SocketPath()
 	if !*embedded && sock != "" && server.Alive(sock) {
 		// One engine, many frontends: stream from the running engine.
-		if err := server.Subscribe(ctx, sock, out); err == nil || ctx.Err() != nil {
+		if err := server.Subscribe(ctx, sock, out, *frontendNotifies); err == nil || ctx.Err() != nil {
 			return ExitOK
 		}
 		// The engine went away; take over with an embedded one.
 	}
-	return runEngine(ctx, rt, out, "embedded", sock)
+	return runEngine(ctx, rt, out, "embedded", sock, *frontendNotifies)
+}
+
+// runDaemon runs the shared engine without a frontend (systemd user service).
+func runDaemon(ctx context.Context, env Env, args []string) int {
+	fs := newFlagSet("daemon", env)
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
+	}
+	rt, err := newRuntime(env)
+	if err != nil {
+		return errorf(env, "%v", err)
+	}
+	sock := rt.paths.SocketPath()
+	if sock == "" {
+		return errorf(env, "daemon: XDG_RUNTIME_DIR is unset; run it from your login session (systemd --user)")
+	}
+	if server.Alive(sock) {
+		return errorf(env, "daemon: another sebab engine already serves %s", sock)
+	}
+	return runEngine(ctx, rt, nil, "daemon", sock, false)
 }
 
 // guardedWriter cancels the engine when stdout breaks (the frontend went away).
@@ -85,7 +107,7 @@ func (g *guardedWriter) Write(p []byte) (int, error) {
 
 // runEngine runs an engine until ctx ends: events go to out (if not nil) and to
 // socket subscribers; config edits are applied live.
-func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock string) int {
+func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock string, localNotifies bool) int {
 	sinks := multiSink{}
 	bc := server.NewBroadcaster(rt.redactor)
 	sinks = append(sinks, bc)
@@ -93,9 +115,7 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 		enc := event.NewEncoder(out, rt.redactor)
 		sinks = append(sinks, engine.SinkFunc(func(ev any) { _ = enc.Encode(ev) }))
 	}
-	if extra := extraSinks(ctx, rt, source); extra != nil {
-		sinks = append(sinks, extra...)
-	}
+	sinks = append(sinks, extraSinks(ctx, rt, bc, localNotifies)...)
 	cfg, cfgErr := loadForEngine(rt)
 	checker := &engine.ProbeChecker{Prober: rt.prober, Secrets: rt.store, Redactor: rt.redactor,
 		OnError: func(ev event.Error) { sinks.Emit(ev) }}
@@ -139,9 +159,11 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 	go func() {
 		<-eng.Started()
 		if cfgErr != nil {
-			sinks.Emit(cfgErr)
+			sinks.Emit(*cfgErr)
 		}
 	}()
+	wg.Add(1)
+	go func() { defer wg.Done(); watchSleep(ctx, rt, eng) }()
 	if err := eng.Run(ctx); err != nil {
 		return errorf(rt.env, "engine: %v", err)
 	}
