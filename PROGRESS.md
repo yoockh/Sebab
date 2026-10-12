@@ -1,7 +1,7 @@
 # Sebab build progress
 
 This file is the resume point for any future session. Status values: `todo`, `wip`, `done`, `blocked`, `needs human`.
-A story's acceptance criteria are ticked only when a test or a verified manual run proves them.
+A story's acceptance criteria are ticked only when a test or a verified manual run proves them (the proof is named).
 
 ## Phase 0: foundations
 
@@ -10,104 +10,111 @@ A story's acceptance criteria are ticked only when a test or a verified manual r
 | Repo skeleton, go.mod, Makefile, CI, README, LICENSE, DECISIONS, PROGRESS, TESTING | done | aa088ba |
 | Event schema v1 as Go types + JSON golden tests | done | 17b01fc |
 | Spike: `sebab watch --format jsonl` hello + heartbeat | done | a1efdf8 |
-| Spike: Noctalia plugin skeleton shows a live value in the bar | done (bar placement needs human) | 17b46a1 |
+| Spike: Noctalia plugin skeleton shows a live value in the bar | done; bar placement needs human (see Needs human) | 17b46a1 |
 
 ## Phase 1: MVP
 
 | Item | Status | Commit |
 |---|---|---|
 | Config (TOML, validation, XDG paths, atomic writes) | done | 0372380 |
-| Probes: local, VPN, DNS, TCP, TLS, HTTP (timings, injectable clock/dialer) | done | 6d7cd09 |
+| Probes: local, VPN, DNS, TCP, TLS, HTTP (timings, injectable clock/dialer) | done | 6d7cd09, abd955c |
 | Diagnosis: every Appendix B cause code, side detection with canary, hints | done | 44ff2f8 |
 | Engine: scheduler, state machine, flap control, notify, heartbeat, offline, suspend guard | done | 64d0c8c |
-| Auth: bearer/header/basic, keyring, `sebab secret set/rm` via stdin, redaction | wip (store+redaction 748da64, CLI pending) | |
-| CLI: check, monitor add/list/edit/rm/pause, watch, doctor | todo | |
+| Auth: bearer/header/basic, keyring, `sebab secret set/rm` via stdin, redaction | done | 748da64, 334aa49 |
+| CLI: check, monitor add/list/edit/rm/pause, watch, doctor | done | 334aa49, c5f0f9e |
 | Failure lab: every Phase 1 cause code, one integration test each | done | 65d09a4 |
-| Noctalia plugin: service, bar widget, panel | todo | |
-| Packaging: AUR PKGBUILDs, goreleaser | todo | |
-| Load plugin into local Noctalia as a dev path source and verify | todo | |
+| Noctalia plugin: service, bar widget, panel | done | 83b0bc9 |
+| Packaging: AUR PKGBUILDs, goreleaser | done (not published) | eda4f11 |
+| Load plugin into local Noctalia as a dev path source and verify | done | 83b0bc9 |
+
+Plugin verification on the maintainer machine (Noctalia 5.2.1): `noctalia msg plugins source add dev path
+<repo>/frontends/noctalia`, `noctalia msg plugins enable yoockh/sebab`; log shows "loaded plugin 'yoockh/sebab'
+(3 entries)", the service runs `bin/sebab watch --session ...`, `noctalia msg plugin yoockh/sebab:engine all dump`
+shows `engine=running` and the `CONFIG_MISSING` hint, `noctalia msg panel-open yoockh/sebab:panel add` renders the
+list and the add form with no Luau warnings. `noctalia plugins lint` and the community-plugins validator pass
+(except the missing thumbnail).
 
 ### Story acceptance criteria
 
 Story 1: Add an HTTP(S) or TCP monitor (Must)
-- [ ] Panel "Add" form accepts name, target, interval, expected status codes
-- [ ] Invalid input rejected with a specific message
-- [ ] Immediate test check runs and result shown before saving
-- [ ] Written to config.toml and appears in all frontends without restarting
-- [ ] CLI `sebab monitor add --name ... --target ...`
+- [x] Panel "Add" form accepts name, target, interval, expected status codes (frontends/noctalia panel_test)
+- [x] Invalid input rejected with a specific message (panel_test: form.err_port/err_interval; cli TestMonitorCRUD)
+- [x] Immediate test check runs and result shown before saving (panel_test "Test, then save"; `monitor add` prints "Test check:")
+- [x] Written to config.toml and appears in all frontends without restarting (cli TestWatchRunsEngineServesSocketAndReloads)
+- [x] CLI `sebab monitor add --name ... --target ...` (cli TestMonitorCRUD)
 
 Story 2: Layered diagnosis (Must)
-- [ ] Probes run in order and stop at first failure
-- [ ] Every failure maps to exactly one cause code with summary and hint
-- [ ] Each completed step's timing included in the event
-- [ ] Every Phase 1 cause code reproduced by the failure lab with an automated test
+- [x] Probes run in order and stop at first failure (lab tests: later timings are null after the failing step)
+- [x] Every failure maps to exactly one cause code with summary and hint (diagnose TestEveryCodeHasSummaryAndHint)
+- [x] Each completed step's timing included in the event (lab TestLabTCPRefused, TestLabTLSCodes; golden check event)
+- [x] Every Phase 1 cause code reproduced by the failure lab with an automated test (lab/integration_test.go)
 
 Story 3: Your side vs their side (Must)
-- [ ] Canary checked on failure before alerting
-- [ ] Canary failure or no default route: all monitors UNKNOWN, exactly one notification
-- [ ] Local recovery: one "back online" notification, monitors resume
-- [ ] Canary configurable and disable-able (side reported as unknown)
+- [x] Canary checked on failure before alerting (engine observe; lab env.check)
+- [x] Canary failure or no default route: all monitors UNKNOWN, exactly one notification (engine TestLocalOutageOneNotification, TestNoRouteGoesOfflineDirectly)
+- [x] Local recovery: one "back online" notification, monitors resume (engine TestLocalOutageOneNotification)
+- [x] Canary configurable and disable-able, side reported as unknown (config TestCanaryDefaultsAndDisable, engine TestCanaryDisabledReportsUnknownSide)
 
 Story 4: Notifications with cause (Must)
-- [ ] Down notification only after fail_threshold consecutive failures
-- [ ] Title names the monitor, body has cause summary
-- [ ] Recovery after recover_threshold successes, includes downtime
-- [ ] No repeats while state and cause stay the same; cause change triggers one new notification
+- [x] Down notification only after fail_threshold consecutive failures (engine TestFlapControlAndRecovery)
+- [x] Title names the monitor, body has cause summary (same)
+- [x] Recovery after recover_threshold successes, includes downtime (same: "3 minutes")
+- [x] No repeats while state and cause stay the same; cause change triggers one new notification (engine TestCauseChangeNotifiesOnce; plugin service_test dedupe)
 
 Story 5: Bar widget (Must)
-- [ ] Aggregate state: all up, degraded, down count, offline, engine missing, engine stalled
-- [ ] Tooltip lists non-UP monitors with short cause
-- [ ] Left click opens panel; right click forces immediate check
-- [ ] Setup hint when binary missing
-- [ ] "engine stalled" after 3 heartbeat intervals without heartbeat
+- [x] Aggregate state: all up, degraded, down count, offline, engine missing, engine stalled (plugin widget_test)
+- [x] Tooltip lists non-UP monitors with short cause (widget_test)
+- [x] Left click opens panel; right click forces immediate check (widget_test; cli `refresh` test)
+- [x] Setup hint when binary missing (widget_test, service_missing_test)
+- [x] "engine stalled" after 3 heartbeat intervals without heartbeat (service_test stall section)
 
 Story 6: Panel details (Must)
-- [ ] Row per monitor: name, status pill, latency, last check
-- [ ] Expanded failed row: cause, hint, side, timings, down since
-- [ ] Edit, delete (confirm), pause, resume
+- [x] Row per monitor: name, status pill, latency, last check (panel_test)
+- [x] Expanded failed row: cause, hint, side, timings, down since (panel_test)
+- [x] Edit, delete (confirm), pause, resume (panel_test)
 
 Story 7: Authenticated checks (Must)
-- [ ] Bearer, custom header, basic auth
-- [ ] Masked token field
-- [ ] Secret in Secret Service keyring, config holds reference only
-- [ ] Secret never in events, logs, notifications, copied diagnoses (automated test)
-- [ ] No keyring: user told and offered env-var or 0600 file fallback
-- [ ] 401/403 reported as HTTP_AUTH with token hint
+- [x] Bearer, custom header, basic auth (lab TestLabAuthSuccess; cli TestCheckAuthSecretSources)
+- [x] Masked token field (panel_test asserts password = true)
+- [x] Secret in Secret Service keyring, config holds reference only (cli TestPanelFlowWithHandoffFile)
+- [x] Secret never in events, logs, notifications, copied diagnoses (cli TestSecretNeverLeaksThroughStream, assertNoLeak in CLI tests; panel_test argv check; secret TestRedactorForms)
+- [x] No keyring: user told and offered env-var or 0600 file fallback (cli TestSecretCommandsAndFileFallback, TestDoctorNoKeyringOnArch)
+- [x] 401/403 reported as HTTP_AUTH with token hint (lab TestLabHTTPCodes; cli TestCheckAuthSecretSources)
 
 Story 8: VPN precondition (Must)
-- [ ] `requires_vpn` by interface name
-- [ ] Interface missing/down: PAUSED with VPN_DOWN, one notification per VPN
-- [ ] Interface returns: monitors resume
-- [ ] Sebab never starts/stops/configures the VPN
+- [x] `requires_vpn` by interface name (config; lab TestLabVPNDown)
+- [x] Interface missing/down: PAUSED with VPN_DOWN, one notification per VPN (engine TestVPNDownPausesAndResumes)
+- [x] Interface returns: monitors resume (same)
+- [x] Sebab never starts/stops/configures the VPN (design; no code path touches VPNs, D6)
 
 Story 9: One-shot CLI check (Must)
-- [ ] Readable layered output with timings; `--json` prints the event
-- [ ] Exit 0 for up, distinct non-zero per failing layer (documented)
-- [ ] Works without config or running engine
+- [x] Readable layered output with timings; `--json` prints the event (cli TestCheckHumanOutput, TestCheckExitCodesPerLayer)
+- [x] Exit 0 for up, distinct non-zero per failing layer (documented in docs/cli.md) (cli TestCheckExitCodesPerLayer)
+- [x] Works without config or running engine (cli TestCheckWorksWithoutConfig)
 
 Story 10: TLS expiry warning (Should)
-- [ ] DEGRADED when leaf expires within tls_warn_days (default 14)
-- [ ] At most one expiry notification per monitor per day
+- [x] DEGRADED when leaf expires within tls_warn_days (default 14) (lab TestLabTLSCodes TLS_EXPIRING_SOON)
+- [x] At most one expiry notification per monitor per day (engine TestTLSExpiryWarningOncePerDay)
 
 Story 11: Copy diagnosis (Should)
-- [ ] Panel button copies redacted Markdown
-- [ ] Redaction covered by secret-safety tests
+- [x] Panel button copies redacted Markdown (panel_test copy; cli `report` tests)
+- [x] Redaction covered by secret-safety tests (cli TestPanelFlowWithHandoffFile, TestSecretNeverLeaksThroughStream)
 
 Story 12: Install and setup (Must)
-- [ ] AUR sebab-bin from signed release with checksums (PKGBUILD written, not published)
-- [ ] Plugin declares `sebab` dependency and documents network calls, file writes, processes
-- [ ] `sebab doctor` reports keyring, notification daemon, ICMP permission (Should)
+- [ ] AUR sebab-bin from signed release with checksums: PKGBUILD + checksum updater written, signed release and AUR publication need human
+- [x] Plugin declares `sebab` dependency and documents network calls, file writes, processes (frontends/noctalia/sebab/README.md)
+- [x] `sebab doctor` reports keyring, notification daemon, ICMP permission (cli doctor tests; real run on Arch)
 
 ## Phase 2
 
 | Item | Status | Commit |
 |---|---|---|
-| Daemon + Unix socket, `watch` attach or embedded fallback, systemd user unit | todo | |
-| Waybar module, example config and CSS | todo | |
-| D-Bus notifications with frontend dedupe | todo | |
-| logind PrepareForSleep handling | todo | |
-| nfpm .deb/.rpm config (build only) | todo | |
-| `sebab doctor` distro differences | todo | |
+| Daemon + Unix socket, `watch` attach or embedded fallback, systemd user unit | done | e123510, 22ad46d |
+| Waybar module, example config and CSS | done | 599e3a0 |
+| D-Bus notifications with frontend dedupe | done | e123510 |
+| logind PrepareForSleep handling | done | 3039143, e123510 |
+| nfpm .deb/.rpm config (build only) | done; installs verified in debian:12, ubuntu:24.04, fedora:42 | c9f1548 |
+| `sebab doctor` distro differences | done | c5f0f9e, 22ad46d |
 
 ## Phase 3 and later
 
@@ -121,10 +128,14 @@ Story 12: Install and setup (Must)
 
 ## Needs human
 
+- Phase 0 exit visual check: place the widget on a bar (Settings → Bar → add "Sebab"), then confirm it renders.
+  Not done automatically because it edits the personal bar layout in `~/.local/state/noctalia/settings.toml`.
 - Phase 1 exit: 30 days of dogfooding with >= 90% diagnosis accuracy.
-- Phase 2 exit: catalog submission to noctalia-dev/community-plugins; package install checks in real Debian/Ubuntu containers by the maintainer.
-- Plugin `thumbnail.webp` (960x540) must be generated with the Noctalia thumbnail generator from a real screenshot.
-- Signed releases: signing key and GitHub release publishing.
+- Phase 2 exit: catalog submission to noctalia-dev/community-plugins; "same engine drives Noctalia and Waybar at
+  the same time" on the real desktop (covered by tests: two frontends attached to one engine).
+- Plugin `thumbnail.webp` (960x540) must be generated with the Noctalia thumbnail generator from a real screenshot
+  (catalog CI requires it; the validator reports only this).
+- Signed releases: GPG key, `GPG_FINGERPRINT`, tagging and publishing GitHub releases; publishing the AUR packages.
 
 ## Blocked
 
@@ -132,4 +143,4 @@ Story 12: Install and setup (Must)
 
 ## Next up
 
-CLI commands (check, monitor, secret, watch with control socket, doctor, report), then the full Noctalia plugin.
+Phase 3: history and sparklines.
