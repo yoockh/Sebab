@@ -132,5 +132,19 @@
     "body": "Delete \"{name}\"? This cannot be undone.",
     "secret_kept": "Its stored secret is kept. Remove it with: sebab secret rm NAME",
     "delete": "Delete"
+  },
+  "card": {
+    "placeholder": "Press Test to see which layer fails, before you save.",
+    "error_title": "Something went wrong",
+    "all_good": "Everything answered: reachable and healthy.",
+    "all_good_hint": "Save to keep watching it.",
+    "side_yours": "Your side",
+    "side_theirs": "Their side",
+    "side_unclear": "Side unclear",
+    "layer_ok": "ok",
+    "layer_fail": "failed",
+    "layer_none": "not run",
+    "layer_skip": "skipped",
+    "no_dns": "no lookup"
   }
 }

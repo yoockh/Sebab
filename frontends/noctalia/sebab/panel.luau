@@ -611,23 +611,103 @@ local function input(name, value, placeholder, onChange, password)
     end })
 end
 
-local function testView()
+-- Result card (D27): always shown above the form's buttons, never inside the
+-- scroll. States: placeholder, testing, result, error.
+local LAYERS = {
+  { id = "local", label = "Local" }, { id = "vpn", label = "VPN" }, { id = "dns", label = "DNS", timing = "dns" },
+  { id = "tcp", label = "TCP", timing = "tcp" }, { id = "tls", label = "TLS", timing = "tls" },
+  { id = "http", label = "HTTP", timing = "ttfb" },
+}
+
+local function layerChips(ev)
+  local failed = ev.cause and ev.cause.layer
+  local degraded = ev.status == "degraded"
+  local reachedFailure = false
+  local isHTTPS = string.match(ev.monitor and ev.monitor.target or form.target or "", "^https://") ~= nil
+  local isTCP = (ev.monitor and ev.monitor.kind) == "tcp"
+  local chips = {}
+  for _, l in ipairs(LAYERS) do
+    local state, value = "ok", ""
+    local skipped = (l.id == "vpn" and trim(form.vpn) == "") or (l.id == "tls" and not isHTTPS)
+      or (isTCP and (l.id == "tls" or l.id == "http"))
+    local ms = l.timing and ev.timings_ms and ev.timings_ms[l.timing]
+    if skipped then
+      state = "skip"
+    elseif reachedFailure then
+      state = "none"
+    elseif failed == l.id and not degraded then
+      state, reachedFailure = "fail", true
+    end
+    if state == "ok" and type(ms) == "number" then
+      value = `{math.floor(ms)} ms`
+    elseif state == "ok" and l.id == "dns" and ms == nil then
+      value = tr("card.no_dns") -- literal IP: no lookup
+    else
+      value = tr("card.layer_" .. state)
+    end
+    local color = ({ ok = "primary", fail = "error", none = "on_surface/0.18", skip = "on_surface/0.08" })[state]
+    if degraded and failed == l.id then
+      color = "tertiary"
+    end
+    table.insert(chips, ui.column({ key = "chip-" .. l.id, flexGrow = 1, gap = 3 }, {
+      ui.label({ text = l.label, fontSize = 11, fontWeight = "semibold", color = "on_surface_variant" }),
+      ui.box({ height = 6, radius = 3, fill = color }),
+      ui.label({ text = value, fontSize = 11, color = state == "fail" and "error" or "on_surface_variant", maxLines = 1 }),
+    }))
+  end
+  return ui.row({ key = "card-chips", gap = 6 }, chips)
+end
+
+local function cardShell(color, children)
+  return ui.column({ key = "result-card", gap = 6, padding = 10, radius = 10, fill = color .. "/0.10",
+    border = color .. "/0.35", borderWidth = 1 }, children)
+end
+
+local function resultCard()
+  if #formErrors > 0 then
+    local rows = { ui.row({ gap = 8, align = "center" }, {
+      ui.glyph({ name = "alert-circle", size = 16, color = "error" }),
+      ui.label({ text = tr("card.error_title"), fontWeight = "semibold", flexGrow = 1 }) }) }
+    for _, e in ipairs(formErrors) do
+      table.insert(rows, ui.label({ text = e, color = "error", fontSize = 12, maxLines = 4 }))
+    end
+    return cardShell("error", rows)
+  end
+  if busy ~= nil and testResult == nil then
+    return cardShell("on_surface", { ui.row({ gap = 8, align = "center" }, {
+      ui.glyph({ name = "loader-2", size = 16, color = "primary" }),
+      ui.label({ text = busy, flexGrow = 1 }) }) })
+  end
   if testResult == nil then
-    return nil
+    return cardShell("on_surface", { ui.row({ gap = 8, align = "center" }, {
+      ui.glyph({ name = "flask", size = 16, color = "on_surface_variant" }),
+      ui.label({ text = tr("card.placeholder"), color = "on_surface_variant", flexGrow = 1, maxLines = 2 }) }) })
   end
   local ev = testResult
   local status = ev.status or "unknown"
-  local rows = { ui.row({ gap = 8, align = "center" }, { pill(status), ui.label({ text = tr("form.test_result"),
-    fontWeight = "semibold", flexGrow = 1 }) }) }
+  local headline, hint = tr("card.all_good"), tr("card.all_good_hint")
   if ev.cause ~= nil then
-    table.insert(rows, ui.label({ text = ev.cause.summary or "", maxLines = 3 }))
-    table.insert(rows, muted(ev.cause.hint or "", { maxLines = 4 }))
+    headline = ev.cause.summary or ""
+    headline = string.upper(string.sub(headline, 1, 1)) .. string.sub(headline, 2)
+    hint = ev.cause.hint or ""
   end
-  local t = common.timings(ev.timings_ms, ev.cause and ev.cause.layer)
-  if t ~= "" then
-    table.insert(rows, muted(t))
+  local side = ev.side
+  local sideText = side == "yours" and tr("card.side_yours") or side == "theirs" and tr("card.side_theirs")
+    or tr("card.side_unclear")
+  local top = { pill(status), ui.label({ text = tr("form.test_result"), fontWeight = "semibold", flexGrow = 1 }) }
+  if ev.cause ~= nil then
+    table.insert(top, muted(sideText))
   end
-  return ui.column({ gap = 4, padding = 8, radius = 8, fill = common.statusStyle(status).color .. "/0.10" }, rows)
+  local total = ev.timings_ms and ev.timings_ms.total
+  if type(total) == "number" then
+    table.insert(top, muted(`{math.floor(total)} ms`))
+  end
+  return cardShell(common.statusStyle(status).color, {
+    ui.row({ gap = 8, align = "center" }, top),
+    ui.label({ text = headline, fontWeight = "semibold", maxLines = 3 }),
+    muted(hint, { maxLines = 4 }),
+    layerChips(ev),
+  })
 end
 
 local function formView()
@@ -666,15 +746,6 @@ local function formView()
     ui.toggle({ checked = f.insecure, onChange = function(v) f.insecure = v == "true"; testResult = nil; render() end }),
     ui.label({ text = tr("form.insecure"), flexGrow = 1, maxLines = 2, color = f.insecure and "error" or "on_surface" }),
   }))
-  -- Feedback lives outside the scroll so it is always visible (D23).
-  local feedback = {}
-  for _, e in ipairs(formErrors) do
-    table.insert(feedback, ui.label({ text = e, color = "error", fontSize = 12, maxLines = 4 }))
-  end
-  local card = testView()
-  if card ~= nil then
-    table.insert(feedback, card)
-  end
   local title = f.mode == "add" and tr("form.add_title") or tr("form.edit_title", { name = f.name })
   local buttons = ui.row({ key = "form-actions", gap = 8, justify = "end" }, {
     ui.button({ text = tr("form.cancel"), variant = "ghost", onClick = cancelForm }),
@@ -682,11 +753,8 @@ local function formView()
     ui.button({ text = testResult and tr("form.save") or tr("form.test_and_save"), glyph = "device-floppy",
       variant = "primary", enabled = busy == nil, onClick = save }),
   })
-  local pinnedFeedback = nil
-  if #feedback > 0 then
-    pinnedFeedback = ui.column({ key = "form-feedback", gap = 4 }, feedback)
-  end
-  return frame(header(title), "form-scroll", fields, { pinnedFeedback, buttons, statusLine(), n = 3 })
+  -- The result card replaces the busy line while the form is open (D27).
+  return frame(header(title), "form-scroll", fields, { resultCard(), buttons, n = 2 })
 end
 
 local function confirmView()

@@ -221,3 +221,15 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   and "no test result") took a share of the free height away from the scroll. Placeholders are now omitted
   instead; `panel_layout_test.luau` asserts no spacer exists and only the scroll grows. Noctalia reads the panel
   size from the manifest when the plugin is (re)enabled, not on `config-reload`.
+
+## D27. Result card pinned above the form buttons
+
+- **What:** the add/edit form always shows one card between the scrolling fields and the buttons. States:
+  placeholder ("Press Test to see which layer fails"), testing, result, error. A result shows the status pill,
+  the cause as a plain sentence, the next step (hint), whose side it is (your side / their side / side unclear),
+  the total time, and one chip per layer (Local, VPN, DNS, TCP, TLS, HTTP): ok with ms where the engine measures
+  it (DNS, TCP, TLS, time to first byte for HTTP), failed, not run, or skipped (no VPN configured, no TLS for
+  http:// and tcp targets, "no lookup" for literal IPs). Validation and CLI errors use the same card.
+- **Why:** the result has to be visible without scrolling (it was the root cause of D23). The event has no local
+  or VPN timing, so those chips show state only. The form was not split into two columns because 520 px leaves
+  too little room for both.

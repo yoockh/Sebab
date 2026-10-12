@@ -55,7 +55,7 @@ local argv = H.reply(12, json({ v = 1, type = "check", status = "down", side = "
   cause = { layer = "dns", code = "DNS_NXDOMAIN", summary = "domain does not resolve (NXDOMAIN)", hint = "Check the name." },
   timings_ms = { total = 80 } }))
 H.assert(argv[2] == "check", "first click tests")
-H.contains(H.visibleText(H.rendered), "domain does not resolve (NXDOMAIN)", "test result must be visible")
+H.contains(H.visibleText(H.rendered), "Domain does not resolve (NXDOMAIN)", "test result must be visible")
 
 -- A failed save stays on the form and shows a short reason plus the CLI's first stderr line.
 primary()

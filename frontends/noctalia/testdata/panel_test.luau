@@ -144,7 +144,7 @@ H.contains(joined, "--expect 200,204")
 H.assert(argv[#argv] == "https://admin.example.com/api/ping", "target is the positional argument")
 text = H.text(H.rendered)
 H.contains(text, "form.test_result")
-H.contains(text, "credentials rejected (401)")
+H.contains(text, "Credentials rejected (401)")
 
 -- Second click saves.
 clickText("form.save")

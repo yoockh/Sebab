@@ -73,6 +73,8 @@ func TestPanelSaveFlow(t *testing.T) { run(t, "panel.luau", "panel_save_test.lua
 
 func TestPanelLayout(t *testing.T) { run(t, "panel.luau", "panel_layout_test.luau", "") }
 
+func TestPanelResultCard(t *testing.T) { run(t, "panel.luau", "panel_card_test.luau", "") }
+
 // Every translation key used by the scripts and the manifest exists in en.json.
 func TestTranslationsComplete(t *testing.T) {
 	var nested map[string]any
@@ -97,7 +99,7 @@ func TestTranslationsComplete(t *testing.T) {
 		}
 	}
 	flatten("", nested)
-	keyRe := regexp.MustCompile(`(?:noctalia\.tr|tr)\("([a-z_.]*[a-z_])"`)
+	keyRe := regexp.MustCompile(`(?:noctalia\.tr|tr)\("([a-z_.]*[a-z_])"\s*[,)]`)
 	trpRe := regexp.MustCompile(`noctalia\.trp\("([a-z_.]*[a-z_])"`)
 	var missing []string
 	for _, f := range []string{"service.luau", "widget.luau", "panel.luau", "lib/common.luau"} {
@@ -116,6 +118,11 @@ func TestTranslationsComplete(t *testing.T) {
 	for _, s := range []string{"up", "degraded", "down", "unknown", "paused"} {
 		if _, ok := en["status."+s]; !ok {
 			missing = append(missing, "status."+s)
+		}
+	}
+	for _, s := range []string{"ok", "fail", "none", "skip"} {
+		if _, ok := en["card.layer_"+s]; !ok {
+			missing = append(missing, "card.layer_"+s)
 		}
 	}
 	for _, s := range []string{"yours", "theirs", "unknown"} {

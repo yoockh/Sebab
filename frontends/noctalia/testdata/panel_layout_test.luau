@@ -36,4 +36,5 @@ local rowB = H.find(H.rendered, function(n) return n.props.key == "row-b" end)[1
 H.assert(string.find(H.text(rowB), "40 ms", 1, true) == nil, "a down monitor shows no latency")
 onOpen("add")
 checkFrame("form", "form-actions")
+checkFrame("form", "result-card")
 print("panel layout ok")
