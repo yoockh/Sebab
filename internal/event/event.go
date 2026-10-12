@@ -225,6 +225,7 @@ const (
 	ErrConfigInvalid = "CONFIG_INVALID"
 	ErrConfigMissing = "CONFIG_MISSING"
 	ErrSecretMissing = "SECRET_MISSING"
+	ErrNotifyFailed  = "NOTIFY_FAILED"
 	ErrInternal      = "INTERNAL"
 )
 

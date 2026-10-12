@@ -49,6 +49,7 @@ func commands() map[string]command {
 		"watch":        {"stream engine events as JSON lines (attaches to a running engine)", runWatch},
 		"daemon":       {"run the shared engine in the background (systemd user service)", runDaemon},
 		"doctor":       {"explain what is missing (keyring, notifications, network, engine)", runDoctor},
+		"notify-test":  {"send a test notification to the desktop and every [[notify]] channel", runNotifyTest},
 		"refresh":      {"ask the running engine to check now (all monitors, or one id)", runRefresh},
 		"report":       {"print a redacted Markdown diagnosis for a monitor", runReport},
 		"history":      {"show availability, latency and status changes from local history", runHistory},

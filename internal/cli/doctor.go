@@ -158,6 +158,18 @@ func (d *doctor) checkKeyring(ctx context.Context) {
 }
 
 func (d *doctor) checkSecrets() {
+	for _, ch := range d.cfg.Notify {
+		if ch.Secret == "" {
+			continue
+		}
+		if v, _, err := d.rt.store.Resolve(ch.Secret); err != nil {
+			d.add("notify", stateFail, fmt.Sprintf("%s channel: secret %q not found", ch.Type, ch.Secret),
+				"sebab secret set "+ch.Secret)
+		} else {
+			d.rt.redactor.Add(v)
+			d.add("notify", stateOK, fmt.Sprintf("%s channel configured (test it with 'sebab notify-test')", ch.Type), "")
+		}
+	}
 	for _, m := range d.cfg.Monitors {
 		if m.Auth == nil {
 			continue

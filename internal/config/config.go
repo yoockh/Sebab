@@ -61,7 +61,49 @@ func (d Duration) D() time.Duration { return time.Duration(d) }
 type Config struct {
 	Defaults Defaults  `toml:"defaults"`
 	History  History   `toml:"history,omitempty"`
+	Notify   []Channel `toml:"notify,omitempty"`
 	Monitors []Monitor `toml:"monitor"`
+}
+
+// Channel is an external notification channel (opt-in; contacts a third party).
+//
+//	{ type = "webhook",  url = "https://hooks.example.com/sebab", secret = "hook-token" }
+//	{ type = "ntfy",     url = "https://ntfy.example.com/my-topic", secret = "ntfy-token" }
+//	{ type = "telegram", secret = "telegram-bot-token", chat_id = "123456" }
+//
+// secret is a reference (keyring name or env:VAR), never the value.
+type Channel struct {
+	Type   string `toml:"type"`
+	URL    string `toml:"url,omitempty"`
+	Secret string `toml:"secret,omitempty"`
+	ChatID string `toml:"chat_id,omitempty"`
+	APIURL string `toml:"api_url,omitempty"` // telegram only; default https://api.telegram.org
+}
+
+func (c Channel) problems() []string {
+	var probs []string
+	checkURL := func(field, u string) {
+		if err := ValidateURL(u); err != nil {
+			probs = append(probs, fmt.Sprintf("notify %s: %s: %v", c.Type, field, err))
+		}
+	}
+	switch c.Type {
+	case "webhook", "ntfy":
+		checkURL("url", c.URL)
+	case "telegram":
+		if c.Secret == "" || c.ChatID == "" {
+			probs = append(probs, "notify telegram: secret (bot token reference) and chat_id are required")
+		}
+		if c.APIURL != "" {
+			checkURL("api_url", c.APIURL)
+		}
+	default:
+		probs = append(probs, fmt.Sprintf("notify type %q must be webhook, ntfy or telegram", c.Type))
+	}
+	if c.Secret != "" && !secretRef.MatchString(c.Secret) {
+		probs = append(probs, fmt.Sprintf("notify %s: secret must be a secret name or env:VARIABLE", c.Type))
+	}
+	return probs
 }
 
 // History configures the local check history (sparklines, incident reports).
@@ -202,6 +244,9 @@ func (c *Config) Validate() error {
 	probs = append(probs, c.Defaults.validate()...)
 	if c.History.KeepDays < 0 || c.History.KeepDays > 365 {
 		add("history: keep_days must be between 1 and 365")
+	}
+	for _, ch := range c.Notify {
+		probs = append(probs, ch.problems()...)
 	}
 	if len(c.Monitors) > MaxMonitors {
 		add("too many monitors: %d (limit %d)", len(c.Monitors), MaxMonitors)

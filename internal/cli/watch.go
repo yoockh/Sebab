@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yoockh/sebab/internal/channels"
 	"github.com/yoockh/sebab/internal/config"
 	"github.com/yoockh/sebab/internal/engine"
 	"github.com/yoockh/sebab/internal/event"
@@ -118,6 +119,11 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 	}
 	sinks = append(sinks, extraSinks(ctx, rt, bc, localNotifies)...)
 	cfg, cfgErr := loadForEngine(rt)
+	dispatch := channels.NewDispatcher(ctx, cfg.Notify, rt.store, rt.redactor, func(msg string) {
+		ev := event.NewError(time.Now(), event.ErrNotifyFailed, msg)
+		sinks.Emit(ev)
+	})
+	sinks = append(sinks, dispatch)
 	checker := &engine.ProbeChecker{Prober: rt.prober, Secrets: rt.store, Redactor: rt.redactor,
 		OnError: func(ev event.Error) { sinks.Emit(ev) }}
 	opts := engine.Options{Clock: rt.clock(), Checker: checker, Canary: rt.canary(cfg.EngineSettings()),
@@ -139,6 +145,7 @@ func runEngine(ctx context.Context, rt *runtime, out io.Writer, source, sock str
 			sinks.Emit(event.NewError(time.Now(), event.ErrConfigInvalid, rt.redactor.Scrub(err.Error())))
 			return err
 		}
+		dispatch.Configure(c.Notify)
 		eng.Reload(c)
 		return nil
 	}

@@ -74,19 +74,19 @@ func (s *desktopSink) Emit(ev any) {
 
 // extraSinks returns platform sinks for an engine.
 func extraSinks(ctx context.Context, rt *runtime, bc *server.Broadcaster, localNotifies bool) []engine.Sink {
-	var send notifyFunc
-	if rt.env.hooks != nil && rt.env.hooks.notify != nil {
-		send = rt.env.hooks.notify
-	} else {
-		n := &linuxplat.Notifier{}
-		go func() { <-ctx.Done(); n.Close() }()
-		send = func(ctx context.Context, title, body, urgency string) error {
-			_, err := n.Notify(ctx, title, body, urgency)
-			return err
-		}
-	}
+	send := rt.desktopSender(ctx)
 	logf := func(format string, a ...any) { fmt.Fprintf(rt.env.Stderr, "sebab: "+format+"\n", a...) }
 	return []engine.Sink{newDesktopSink(ctx, send, bc, rt.redactor, localNotifies, logf)}
+}
+
+// realDesktopSender sends through org.freedesktop.Notifications until ctx ends.
+func realDesktopSender(ctx context.Context) notifyFunc {
+	n := &linuxplat.Notifier{}
+	go func() { <-ctx.Done(); n.Close() }()
+	return func(ctx context.Context, title, body, urgency string) error {
+		_, err := n.Notify(ctx, title, body, urgency)
+		return err
+	}
 }
 
 // watchSleep forwards logind suspend/resume to the engine. Without a system

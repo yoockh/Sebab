@@ -2,6 +2,9 @@ package cli
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/yoockh/sebab/internal/config"
 	"github.com/yoockh/sebab/internal/server"
+	"github.com/yoockh/sebab/lab"
 )
 
 func (w *world) startDaemon() func() {
@@ -215,4 +219,54 @@ func TestSparkline(t *testing.T) {
 	if got := Sparkline([]int64{1, 2, 3}, 2); got != "▅█" {
 		t.Errorf("width: %q", got)
 	}
+}
+
+func TestExternalChannelsEndToEnd(t *testing.T) {
+	w := newWorld(t)
+	var mu sync.Mutex
+	var got []string
+	hook := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got = append(got, r.Header.Get("Authorization")+" "+string(b))
+		mu.Unlock()
+	}))
+	defer hook.Close()
+	if code, _, e := w.run(lab.Token+"\n", "secret", "set", "hook-token"); code != 0 {
+		t.Fatal(e)
+	}
+	_ = os.MkdirAll(filepath.Dir(w.configPath()), 0o700)
+	cfg := &config.Config{Defaults: config.Defaults{FailThreshold: 1},
+		Notify: []config.Channel{{Type: "webhook", URL: hook.URL + "/sebab", Secret: "hook-token"}}}
+	if err := cfg.Save(w.configPath()); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ := w.run("", "notify-test")
+	if code != 0 || !strings.Contains(out, "webhook: sent") || !strings.Contains(out, "desktop: sent") {
+		t.Fatalf("notify-test: %d %s", code, out)
+	}
+	if code, _, e := w.run("", "monitor", "add", "--name", "Gateway", "--target", w.url("/status/502"), "--no-test"); code != 0 {
+		t.Fatal(e)
+	}
+	wt := w.startWatch("--embedded")
+	wt.waitFor(t, "down", checkFor("gateway", "down"))
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(got)
+		mu.Unlock()
+		if n >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("webhook calls: %v", got)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(got[1], `"title":"Gateway is down"`) || !strings.HasPrefix(got[1], "Bearer ") {
+		t.Fatalf("webhook payload %q", got[1])
+	}
+	w.assertNoLeak(wt.out.String())
 }

@@ -273,3 +273,33 @@ func TestQuietHours(t *testing.T) {
 		t.Error("quiet hours not resolved")
 	}
 }
+
+func TestNotifyChannels(t *testing.T) {
+	ok := `
+[[notify]]
+type = "webhook"
+url = "https://hooks.example.com/sebab"
+[[notify]]
+type = "ntfy"
+url = "https://ntfy.example.com/topic"
+secret = "env:NTFY_TOKEN"
+[[notify]]
+type = "telegram"
+secret = "tg-token"
+chat_id = "42"
+`
+	c, err := Parse([]byte(ok))
+	if err != nil || len(c.Notify) != 3 {
+		t.Fatalf("%v %+v", err, c)
+	}
+	for _, bad := range []string{
+		"[[notify]]\ntype=\"sms\"\n",
+		"[[notify]]\ntype=\"webhook\"\nurl=\"ftp://x.example\"\n",
+		"[[notify]]\ntype=\"telegram\"\nchat_id=\"1\"\n",
+		"[[notify]]\ntype=\"ntfy\"\nurl=\"https://n.example/t\"\nsecret=\"has spaces\"\n",
+	} {
+		if _, err := Parse([]byte(bad)); err == nil {
+			t.Errorf("should fail: %s", bad)
+		}
+	}
+}

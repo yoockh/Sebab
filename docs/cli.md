@@ -137,6 +137,12 @@ History lives in `$XDG_STATE_HOME/sebab/history` (0600 files, pruned after
 `sebab report` appends the last 24 h of status changes and stats, which makes
 it an incident report you can paste into a bug ticket.
 
+## sebab notify-test
+
+Sends one test notification to the desktop (`org.freedesktop.Notifications`)
+and to every `[[notify]]` channel (webhook, ntfy, Telegram; see `config.md`),
+and prints the result of each. Exit code 1 when any channel failed.
+
 ## sebab refresh / report / doctor
 
 ```sh
