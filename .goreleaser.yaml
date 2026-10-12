@@ -1,0 +1,74 @@
+# GoReleaser v2 configuration. Build locally with:
+#   goreleaser release --snapshot --clean
+# Releases are created as drafts and are never published by this repository's
+# automation; the maintainer publishes them by hand.
+version: 2
+
+project_name: sebab
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: sebab
+    main: ./cmd/sebab
+    binary: sebab
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/yoockh/sebab/internal/version.Version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: sebab
+    ids: [sebab]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - docs/*
+      - frontends/waybar/*
+      - packaging/systemd/*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# Signed release (PRD Story 12): the checksum file is signed with the
+# maintainer's GPG key, so one signature covers every artifact. Set
+# GPG_FINGERPRINT in the environment that runs goreleaser.
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "-u"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  draft: true
+  prerelease: auto

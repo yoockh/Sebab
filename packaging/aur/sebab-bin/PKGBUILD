@@ -1,0 +1,39 @@
+# Maintainer: yoockh <yoockh at users dot noreply dot github dot com>
+#
+# Binary package built from the signed GitHub release. Before publishing a new
+# version run ../update-checksums.sh <version>, which downloads checksums.txt,
+# verifies its GPG signature and fills in sha256sums below.
+
+pkgname=sebab-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Endpoint monitor that names the failing layer (DNS, TCP, TLS, HTTP) and whose side the fault is on"
+arch=('x86_64' 'aarch64')
+url="https://github.com/yoockh/sebab"
+license=('MIT')
+provides=('sebab')
+conflicts=('sebab' 'sebab-git')
+optdepends=(
+  'gnome-keyring: Secret Service keyring for authenticated monitors'
+  'keepassxc: alternative Secret Service provider'
+  'noctalia: bar widget and panel (enable the yoockh/sebab plugin)'
+  'waybar: bar module (sebab waybar)'
+)
+source_x86_64=("${url}/releases/download/v${pkgver}/sebab_${pkgver}_linux_amd64.tar.gz")
+source_aarch64=("${url}/releases/download/v${pkgver}/sebab_${pkgver}_linux_arm64.tar.gz")
+# Filled by update-checksums.sh from the signed checksums.txt of the release.
+sha256sums_x86_64=('0000000000000000000000000000000000000000000000000000000000000000')
+sha256sums_aarch64=('0000000000000000000000000000000000000000000000000000000000000000')
+
+package() {
+  install -Dm755 sebab "${pkgdir}/usr/bin/sebab"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/sebab/README.md"
+  if [[ -d packaging/systemd ]]; then
+    install -Dm644 packaging/systemd/sebab.service "${pkgdir}/usr/lib/systemd/user/sebab.service"
+  fi
+  if [[ -d frontends/waybar ]]; then
+    install -d "${pkgdir}/usr/share/doc/sebab/waybar"
+    install -m644 frontends/waybar/* "${pkgdir}/usr/share/doc/sebab/waybar/"
+  fi
+}

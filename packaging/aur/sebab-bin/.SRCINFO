@@ -1,0 +1,21 @@
+pkgbase = sebab-bin
+	pkgdesc = Endpoint monitor that names the failing layer (DNS, TCP, TLS, HTTP) and whose side the fault is on
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/yoockh/sebab
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	optdepends = gnome-keyring: Secret Service keyring for authenticated monitors
+	optdepends = keepassxc: alternative Secret Service provider
+	optdepends = noctalia: bar widget and panel (enable the yoockh/sebab plugin)
+	optdepends = waybar: bar module (sebab waybar)
+	provides = sebab
+	conflicts = sebab
+	conflicts = sebab-git
+	source_x86_64 = https://github.com/yoockh/sebab/releases/download/v0.1.0/sebab_0.1.0_linux_amd64.tar.gz
+	sha256sums_x86_64 = 0000000000000000000000000000000000000000000000000000000000000000
+	source_aarch64 = https://github.com/yoockh/sebab/releases/download/v0.1.0/sebab_0.1.0_linux_arm64.tar.gz
+	sha256sums_aarch64 = 0000000000000000000000000000000000000000000000000000000000000000
+
+pkgname = sebab-bin

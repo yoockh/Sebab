@@ -1,0 +1,21 @@
+pkgbase = sebab-git
+	pkgdesc = Endpoint monitor that names the failing layer (DNS, TCP, TLS, HTTP) and whose side the fault is on (git)
+	pkgver = 0.1.0.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/yoockh/sebab
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = git
+	makedepends = go
+	optdepends = gnome-keyring: Secret Service keyring for authenticated monitors
+	optdepends = keepassxc: alternative Secret Service provider
+	optdepends = noctalia: bar widget and panel (enable the yoockh/sebab plugin)
+	optdepends = waybar: bar module (sebab waybar)
+	provides = sebab
+	conflicts = sebab
+	conflicts = sebab-bin
+	source = sebab::git+https://github.com/yoockh/sebab.git
+	sha256sums = SKIP
+
+pkgname = sebab-git

@@ -1,0 +1,55 @@
+# Maintainer: yoockh <yoockh at users dot noreply dot github dot com>
+
+pkgname=sebab-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc="Endpoint monitor that names the failing layer (DNS, TCP, TLS, HTTP) and whose side the fault is on (git)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/yoockh/sebab"
+license=('MIT')
+makedepends=('git' 'go')
+provides=('sebab')
+conflicts=('sebab' 'sebab-bin')
+optdepends=(
+  'gnome-keyring: Secret Service keyring for authenticated monitors'
+  'keepassxc: alternative Secret Service provider'
+  'noctalia: bar widget and panel (enable the yoockh/sebab plugin)'
+  'waybar: bar module (sebab waybar)'
+)
+source=("sebab::git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd sebab
+  if git describe --long --tags --abbrev=7 >/dev/null 2>&1; then
+    git describe --long --tags --abbrev=7 | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+  else
+    printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  fi
+}
+
+build() {
+  cd sebab
+  export CGO_ENABLED=0
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  go build -ldflags "-s -w -X github.com/yoockh/sebab/internal/version.Version=${pkgver}" -o sebab ./cmd/sebab
+}
+
+check() {
+  cd sebab
+  go test ./...
+}
+
+package() {
+  cd sebab
+  install -Dm755 sebab "${pkgdir}/usr/bin/sebab"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/sebab/README.md"
+  if [[ -f packaging/systemd/sebab.service ]]; then
+    install -Dm644 packaging/systemd/sebab.service "${pkgdir}/usr/lib/systemd/user/sebab.service"
+  fi
+  if [[ -d frontends/waybar ]]; then
+    install -d "${pkgdir}/usr/share/doc/sebab/waybar"
+    install -m644 frontends/waybar/* "${pkgdir}/usr/share/doc/sebab/waybar/"
+  fi
+}
