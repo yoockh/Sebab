@@ -19,6 +19,7 @@ func main() {
 	dns := flag.String("dns", "127.0.0.1:15353", "address for the lab DNS server")
 	base := flag.Int("base-port", 18080, "first of 9 consecutive loopback ports")
 	out := flag.String("out", "lab/out", "directory for ca.pem and config.toml")
+	caRef := flag.String("ca-ref", "", "CA path to write into config.toml (default: the real path; set when running in a container)")
 	flag.Parse()
 	ports := make([]int, 9)
 	for i := range ports {
@@ -40,7 +41,11 @@ func main() {
 		os.Exit(1)
 	}
 	cfgPath, _ := filepath.Abs(filepath.Join(*out, "config.toml"))
-	if err := os.WriteFile(cfgPath, []byte(Config(l, caPath)), 0o600); err != nil {
+	ref := caPath
+	if *caRef != "" {
+		ref = *caRef
+	}
+	if err := os.WriteFile(cfgPath, []byte(Config(l, ref)), 0o600); err != nil {
 		fmt.Fprintln(os.Stderr, "sebab-lab:", err)
 		os.Exit(1)
 	}
