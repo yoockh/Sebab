@@ -283,3 +283,18 @@ Each entry: what was decided, why, and the alternatives considered. Newest at th
   on open, after a save, and from engine state updates at most once a minute; no constant timer.
 - **Empty states:** "no history yet" for uptime and strips, "No status changes in the last 24 h." for incidents,
   and "Loading history..." until the first answer.
+
+## D32. README redesign
+
+- **What:** the README was rewritten as a project landing page: centered header, shields.io badges in three rows
+  (build/status, tech stack, platform), screenshots, table of contents, Mermaid diagrams for the layered diagnosis
+  and the architecture, the full cause-code table, features with a stable/beta/planned status, installation,
+  quick start, usage, configuration, failure lab, roadmap, layout, contributing, license and security.
+- **Choices:** no emoji anywhere in the README (owner request). Every section heading has an explicit `<a id>`
+  anchor and the table of contents links to those, so links keep working if a heading is reworded. The CI badge uses the workflow-status endpoint for `yoockh/Sebab`; it shows "repo
+  not found" or no status until the repository is public and CI has run once. Status labels: "stable" for the
+  Phase 1 core with failure-lab coverage, "beta" for newer frontends and Phase 2/3 features, "planned" for
+  anything not built or not published (packages are built and install-tested but not released). The sample
+  `sebab check` output was captured verbatim against the failure lab. Screenshots are not generated: `docs/img/`
+  holds a `.gitkeep` and the README carries an HTML comment asking a human to add `panel.png` and `tui.png`. Both
+  Mermaid diagrams were rendered with `@mermaid-js/mermaid-cli` to confirm they parse.
