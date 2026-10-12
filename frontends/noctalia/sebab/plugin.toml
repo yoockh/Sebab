@@ -1,0 +1,25 @@
+id           = "yoockh/sebab"
+name         = "Sebab"
+version      = "0.1.0"
+plugin_api   = 32
+author       = "yoockh"
+license      = "MIT"
+icon         = "heart-rate-monitor"
+description  = "Endpoint monitor that names the failing layer (DNS, TCP, TLS, HTTP) and whose side the fault is on."
+tags         = ["bar", "panel", "service", "network", "development", "indicator"]
+dependencies = ["sebab"]
+
+[[setting]]
+key             = "binary"
+type            = "string"
+label_key       = "settings.binary.label"
+description_key = "settings.binary.description"
+default         = "sebab"
+
+[[service]]
+id    = "engine"
+entry = "service.luau"
+
+[[widget]]
+id    = "status"
+entry = "widget.luau"

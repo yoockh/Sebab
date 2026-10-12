@@ -1,0 +1,4 @@
+{
+  "settings.binary.label": "Engine binary",
+  "settings.binary.description": "Name or absolute path of the sebab executable."
+}
