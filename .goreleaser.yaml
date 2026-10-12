@@ -33,7 +33,9 @@ archives:
       - LICENSE
       - README.md
       - docs/*
-      - frontends/waybar/*
+      - frontends/waybar/*.jsonc
+      - frontends/waybar/*.css
+      - frontends/waybar/README.md
       - packaging/systemd/*
 
 # .deb and .rpm (mirrors packaging/nfpm/nfpm.yaml).
