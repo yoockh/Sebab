@@ -1,0 +1,1 @@
+{"v":1,"type":"check","ts":"2026-10-11T13:01:00.000Z","monitor":{"id":"web","name":"Web","kind":"http","target":"https://www.example.com/"},"status":"up","observed":"up","timings_ms":{"dns":3,"tcp":20,"tls":41,"ttfb":90,"total":95},"details":{"http_status":200,"address":"192.0.2.10:443","family":"ipv4"},"notify":false}

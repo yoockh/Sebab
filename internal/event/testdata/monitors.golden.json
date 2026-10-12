@@ -1,0 +1,1 @@
+{"v":1,"type":"monitors","ts":"2026-10-11T13:01:00.000Z","monitors":[{"id":"staging-db","name":"Staging DB","kind":"tcp","target":"tcp://db.staging.example:5432","interval_s":60,"paused":false}]}

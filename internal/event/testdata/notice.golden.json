@@ -1,0 +1,1 @@
+{"v":1,"type":"notice","ts":"2026-10-11T13:01:00.000Z","kind":"offline","message":"You are offline: no default route. 7 monitors paused.","notify":true,"notification":{"id":"offline:1760187660","title":"You are offline","body":"No default route. 7 monitors paused.","urgency":"critical"}}
