@@ -266,6 +266,7 @@ type MonitorInfo struct {
 	Target      string `json:"target"`
 	IntervalS   int    `json:"interval_s"`
 	Paused      bool   `json:"paused"`
+	Muted       bool   `json:"muted,omitempty"`
 	RequiresVPN string `json:"requires_vpn,omitempty"`
 	Auth        string `json:"auth,omitempty"` // auth type only
 	InsecureTLS bool   `json:"insecure_tls,omitempty"`

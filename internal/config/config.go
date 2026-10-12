@@ -82,6 +82,9 @@ type Defaults struct {
 	// Canary nil means the default list; an empty list disables the canary.
 	Canary    *[]string `toml:"canary,omitempty"`
 	DNSCanary *[]string `toml:"dns_canary,omitempty"`
+	// QuietHours ("22:00-07:00", local time) suppresses notifications; the
+	// state is still tracked and shown.
+	QuietHours string `toml:"quiet_hours,omitempty"`
 }
 
 // Auth describes credentials. The secret itself never lives in config.toml:
@@ -112,6 +115,7 @@ type Monitor struct {
 	RecoverThreshold     int               `toml:"recover_threshold,omitempty"`
 	TLSWarnDays          *int              `toml:"tls_warn_days,omitempty"`
 	Paused               bool              `toml:"paused,omitempty"`
+	Muted                bool              `toml:"muted,omitempty"` // checked and shown, never notified
 	Method               string            `toml:"method,omitempty"`
 	Headers              map[string]string `toml:"headers,omitempty"`
 	Auth                 *Auth             `toml:"auth,omitempty"`
@@ -239,6 +243,11 @@ func (d Defaults) validate() []string {
 			if _, _, err := ParseTCPTarget(c); err != nil {
 				probs = append(probs, fmt.Sprintf("defaults: canary %q: %v", c, err))
 			}
+		}
+	}
+	if d.QuietHours != "" {
+		if _, err := ParseQuietHours(d.QuietHours); err != nil {
+			probs = append(probs, "defaults: "+err.Error())
 		}
 	}
 	if d.DNSCanary != nil {
@@ -469,4 +478,43 @@ func Slugify(name string) string {
 		s = "monitor"
 	}
 	return s
+}
+
+// QuietHours is a daily window in local time; it may wrap midnight.
+type QuietHours struct {
+	Start, End time.Duration // offsets from midnight
+}
+
+// ParseQuietHours parses "HH:MM-HH:MM".
+func ParseQuietHours(s string) (QuietHours, error) {
+	a, b, ok := strings.Cut(strings.TrimSpace(s), "-")
+	if !ok {
+		return QuietHours{}, fmt.Errorf("quiet_hours %q must look like \"22:00-07:00\"", s)
+	}
+	start, err1 := parseClock(a)
+	end, err2 := parseClock(b)
+	if err1 != nil || err2 != nil || start == end {
+		return QuietHours{}, fmt.Errorf("quiet_hours %q must look like \"22:00-07:00\"", s)
+	}
+	return QuietHours{Start: start, End: end}, nil
+}
+
+func parseClock(s string) (time.Duration, error) {
+	t, err := time.Parse("15:04", strings.TrimSpace(s))
+	if err != nil {
+		return 0, err
+	}
+	return time.Duration(t.Hour())*time.Hour + time.Duration(t.Minute())*time.Minute, nil
+}
+
+// Contains reports whether t (in its own location) falls inside the window.
+func (q QuietHours) Contains(t time.Time) bool {
+	if q.Start == q.End {
+		return false
+	}
+	off := time.Duration(t.Hour())*time.Hour + time.Duration(t.Minute())*time.Minute
+	if q.Start < q.End {
+		return off >= q.Start && off < q.End
+	}
+	return off >= q.Start || off < q.End
 }

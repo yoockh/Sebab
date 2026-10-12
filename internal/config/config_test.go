@@ -241,3 +241,35 @@ assert = [
 		t.Error("tcp monitors cannot have assertions")
 	}
 }
+
+func TestQuietHours(t *testing.T) {
+	q, err := ParseQuietHours("22:00-07:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(h, m int) time.Time { return time.Date(2026, 10, 11, h, m, 0, 0, time.UTC) }
+	for _, tc := range []struct {
+		t    time.Time
+		want bool
+	}{{at(23, 0), true}, {at(2, 30), true}, {at(6, 59), true}, {at(7, 0), false}, {at(12, 0), false}, {at(22, 0), true}} {
+		if got := q.Contains(tc.t); got != tc.want {
+			t.Errorf("%v: %v", tc.t, got)
+		}
+	}
+	day, _ := ParseQuietHours("12:00-13:30")
+	if !day.Contains(at(13, 29)) || day.Contains(at(13, 30)) {
+		t.Error("non-wrapping window")
+	}
+	for _, bad := range []string{"22-07", "25:00-07:00", "07:00-07:00", "nope"} {
+		if _, err := ParseQuietHours(bad); err == nil {
+			t.Errorf("%q should fail", bad)
+		}
+	}
+	if _, err := Parse([]byte("[defaults]\nquiet_hours = \"late\"\n")); err == nil {
+		t.Error("invalid quiet_hours must fail validation")
+	}
+	c, _ := Parse([]byte("[defaults]\nquiet_hours = \"22:00-07:00\"\n"))
+	if c.EngineSettings().QuietHours == nil {
+		t.Error("quiet hours not resolved")
+	}
+}

@@ -92,6 +92,11 @@ local argv = H.reply(0, "### Sebab diagnosis: Payments API\n")
 H.assert(argv[2] == "report" and argv[3] == "api", "report argv")
 H.assert(H.clipboard == "### Sebab diagnosis: Payments API\n", "clipboard set")
 
+-- Mute.
+clickGlyph("bell-off")
+argv = H.reply(0, json({ ok = true, id = "api" }))
+H.assert(argv[2] == "monitor" and argv[3] == "mute" and argv[4] == "api", "mute argv")
+
 -- Pause.
 clickGlyph("player-pause")
 argv = H.reply(0, json({ ok = true, id = "api" }))

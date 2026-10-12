@@ -221,7 +221,7 @@ func details(r probe.Result) *event.Details {
 func monitorInfo(s config.Settings) event.MonitorInfo {
 	m := s.Monitor
 	info := event.MonitorInfo{ID: m.ID, Name: m.Name, Kind: m.Kind(), Target: secret.RedactURL(m.Endpoint()),
-		IntervalS: int(s.Interval.Seconds()), Paused: m.Paused, InsecureTLS: m.InsecureTLS}
+		IntervalS: int(s.Interval.Seconds()), Paused: m.Paused, Muted: m.Muted, InsecureTLS: m.InsecureTLS}
 	if m.RequiresVPN != nil {
 		info.RequiresVPN = m.RequiresVPN.Interface
 	}

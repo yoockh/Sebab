@@ -296,3 +296,28 @@ func TestCheckAndMonitorAssertions(t *testing.T) {
 		t.Fatalf("assertions should be cleared: %+v", cfg.Monitors[0].Assert)
 	}
 }
+
+func TestMonitorMuteUnmute(t *testing.T) {
+	w := newWorld(t)
+	if code, _, _ := w.run("", "monitor", "add", "--name", "A", "--target", w.url("/ok"), "--no-test"); code != 0 {
+		t.Fatal("add")
+	}
+	if code, _, _ := w.run("", "monitor", "mute", "a"); code != 0 {
+		t.Fatal("mute")
+	}
+	cfg, _ := config.Load(w.configPath())
+	if !cfg.Monitors[0].Muted {
+		t.Fatal("not muted")
+	}
+	code, out, _ := w.run("", "monitor", "show", "a")
+	if code != 0 || !strings.Contains(out, `"muted":true`) {
+		t.Fatalf("show: %s", out)
+	}
+	if code, _, _ := w.run("", "monitor", "unmute", "a"); code != 0 {
+		t.Fatal("unmute")
+	}
+	cfg, _ = config.Load(w.configPath())
+	if cfg.Monitors[0].Muted {
+		t.Fatal("still muted")
+	}
+}

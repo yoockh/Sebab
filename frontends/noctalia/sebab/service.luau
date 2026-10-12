@@ -126,6 +126,7 @@ local function applyMonitors(list)
     local m = monitors[info.id] or {}
     m.id, m.name, m.kind, m.target = info.id, info.name, info.kind, info.target
     m.intervalS, m.paused, m.vpn, m.auth, m.insecure = info.interval_s, info.paused, info.requires_vpn, info.auth, info.insecure_tls
+    m.muted = info.muted == true
     next[info.id] = m
     table.insert(order, info.id)
   end

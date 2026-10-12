@@ -697,3 +697,84 @@ func TestHistoryRecordsObservationsAndAddsRecent(t *testing.T) {
 		t.Errorf("a snapshot must not record history, got %d", len(hist.records))
 	}
 }
+
+func startWith(t *testing.T, cfg *config.Config) *harness {
+	t.Helper()
+	h := &harness{t: t, clock: NewFakeClock(t0), script: newScript(), canary: &fakeCanary{ok: true}, rec: &recorder{}, cfg: cfg}
+	h.eng = New(cfg, Options{Clock: h.clock, Checker: h.script, Canary: h.canary, Sink: h.rec, Network: platform.Online(),
+		NoJitter: true, Location: time.UTC})
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancel, h.done = cancel, make(chan struct{})
+	go func() { _ = h.eng.Run(ctx); close(h.done) }()
+	t.Cleanup(h.stop)
+	<-h.eng.Started()
+	return h
+}
+
+func TestMutedMonitorNeverNotifies(t *testing.T) {
+	m := monitor("api")
+	m.Muted = true
+	h := startWith(t, &config.Config{Monitors: []config.Monitor{m}})
+	h.script.set("api", diagnose.HTTPBadGateway)
+	h.settle(2)
+	h.tick(0, 2)
+	h.tick(interval, 2)
+	cs := h.waitChecks("api", 2)
+	if cs[1].Status != event.StatusDown {
+		t.Fatalf("muted monitors are still checked and shown: %+v", cs[1])
+	}
+	if n := h.rec.notifications(); len(n) != 0 {
+		t.Fatalf("muted monitor notified: %+v", n)
+	}
+	var mon event.Monitors
+	for _, ev := range h.rec.all() {
+		if x, ok := ev.(event.Monitors); ok {
+			mon = x
+		}
+	}
+	if !mon.Monitors[0].Muted {
+		t.Error("monitors event should flag muted monitors")
+	}
+	// Unmuting through a reload keeps the state and the worker (no re-check, no reset).
+	before := h.script.count("api")
+	cfg := &config.Config{Monitors: []config.Monitor{monitor("api")}}
+	h.eng.Reload(cfg)
+	h.settle(2)
+	if h.script.count("api") != before {
+		t.Error("a mute toggle must not restart the monitor")
+	}
+	if c, ok := h.eng.LastCheck(context.Background(), "api"); !ok || c.Status != event.StatusDown {
+		t.Errorf("state lost on mute toggle: %+v", c)
+	}
+}
+
+func TestQuietHoursSuppressNotifications(t *testing.T) {
+	// t0 is 12:00 UTC.
+	cfg := &config.Config{Defaults: config.Defaults{QuietHours: "11:00-13:00"},
+		Monitors: []config.Monitor{monitor("api"), monitor("db")}}
+	h := startWith(t, cfg)
+	h.script.set("api", diagnose.HTTPBadGateway)
+	h.script.set("db", "")
+	h.settle(3)
+	h.tick(0, 3)
+	h.tick(interval, 3)
+	h.waitChecks("api", 2)
+	if n := h.rec.notifications(); len(n) != 0 {
+		t.Fatalf("quiet hours must suppress notifications: %+v", n)
+	}
+	// A local outage during quiet hours is shown but not notified either.
+	h.canary.set(false)
+	h.script.set("db", diagnose.TCPTimeout)
+	h.tick(interval, 4)
+	if len(h.rec.notices(event.NoticeOffline)) != 1 || len(h.rec.notifications()) != 0 {
+		t.Fatalf("offline notice should exist without notify: %+v", h.rec.notifications())
+	}
+	// After 13:00 notifications flow again.
+	h.canary.set(true)
+	h.script.set("db", "")
+	h.tick(70*time.Minute, 3)
+	h.waitNotices(event.NoticeOnline, 1)
+	if n := h.rec.notifications(); len(n) != 1 || n[0].Title != "Back online" {
+		t.Fatalf("after quiet hours: %+v", n)
+	}
+}

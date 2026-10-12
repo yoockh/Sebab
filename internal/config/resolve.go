@@ -6,9 +6,10 @@ import (
 
 // Engine holds the resolved engine-wide settings.
 type Engine struct {
-	Heartbeat time.Duration
-	Canary    []string // empty means disabled
-	DNSCanary []string
+	Heartbeat  time.Duration
+	Canary     []string // empty means disabled
+	DNSCanary  []string
+	QuietHours *QuietHours // nil when unset
 }
 
 // Settings are a monitor's fully resolved values (defaults applied).
@@ -36,6 +37,9 @@ func (c *Config) EngineSettings() Engine {
 	}
 	if d.DNSCanary != nil {
 		e.DNSCanary = *d.DNSCanary
+	}
+	if q, err := ParseQuietHours(d.QuietHours); d.QuietHours != "" && err == nil {
+		e.QuietHours = &q
 	}
 	return e
 }

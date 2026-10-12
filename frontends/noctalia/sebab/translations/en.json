@@ -80,7 +80,9 @@
     "busy_copy": "Preparing the diagnosis...",
     "busy_refresh": "Asking the engine...",
     "busy_secret": "Preparing a secure handoff...",
-    "recent": "Latency of the last {n} checks (red: failed)"
+    "recent": "Latency of the last {n} checks (red: failed)",
+    "mute": "Mute notifications",
+    "unmute": "Unmute notifications"
   },
   "form": {
     "add_title": "Add monitor",

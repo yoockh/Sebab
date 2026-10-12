@@ -50,8 +50,9 @@ type Options struct {
 	OfflineRecheck time.Duration // default 30s
 	JitterMax      time.Duration // default 10s; 0 in tests via NoJitter
 	NoJitter       bool
-	ResumeGrace    time.Duration // wait after resume before checking; default 15s
-	History        History       // nil disables history
+	ResumeGrace    time.Duration  // wait after resume before checking; default 15s
+	History        History        // nil disables history
+	Location       *time.Location // for quiet hours; default time.Local
 }
 
 // Engine is the scheduler and state machine. Create with New, start with Run.
@@ -62,6 +63,7 @@ type Engine struct {
 	network        platform.Network
 	sink           Sink
 	history        History
+	loc            *time.Location
 	version        string
 	source         string
 	offlineRecheck time.Duration
@@ -95,6 +97,7 @@ type Engine struct {
 	rechecking  bool
 	wakeTimer   Timer
 	resumeGrace time.Duration
+	quiet       *config.QuietHours
 }
 
 type recheck struct {
@@ -122,9 +125,12 @@ func New(cfg *config.Config, opts Options) *Engine {
 	if opts.ResumeGrace <= 0 {
 		opts.ResumeGrace = 15 * time.Second
 	}
+	if opts.Location == nil {
+		opts.Location = time.Local
+	}
 	return &Engine{
 		clock: opts.Clock, checker: opts.Checker, canary: opts.Canary, network: opts.Network,
-		sink: opts.Sink, history: opts.History, version: opts.Version, source: opts.Source,
+		sink: opts.Sink, history: opts.History, loc: opts.Location, version: opts.Version, source: opts.Source,
 		offlineRecheck: opts.OfflineRecheck, jitterMax: opts.JitterMax,
 		obsCh: make(chan observation), reloadCh: make(chan *config.Config, 1),
 		triggerCh: make(chan string, 64), queryCh: make(chan func()), recheckCh: make(chan recheck, 1),
@@ -298,6 +304,7 @@ func (e *Engine) applyConfig(cfg *config.Config, initial bool) {
 	e.cfg = cfg
 	ec := cfg.EngineSettings()
 	e.heartbeat = ec.Heartbeat
+	e.quiet = ec.QuietHours
 	if c, ok := e.canary.(CanaryConfigurer); ok {
 		c.Configure(ec.Canary, ec.DNSCanary)
 	}
@@ -309,6 +316,11 @@ func (e *Engine) applyConfig(cfg *config.Config, initial bool) {
 		order = append(order, id)
 		old, ok := e.mons[id]
 		if ok && reflect.DeepEqual(old.settings, s) {
+			continue
+		}
+		if ok && sameProbe(old.settings, s) {
+			// Only the name or mute flag changed: keep state and the worker.
+			old.settings, old.info = s, monitorInfo(s)
 			continue
 		}
 		if ok {
@@ -339,6 +351,18 @@ func (e *Engine) applyConfig(cfg *config.Config, initial bool) {
 		}
 	}
 	e.emitSummary(true)
+}
+
+// sameProbe reports whether two settings differ only in presentation fields.
+func sameProbe(a, b config.Settings) bool {
+	a.Monitor.Name, b.Monitor.Name = "", ""
+	a.Monitor.Muted, b.Monitor.Muted = false, false
+	return reflect.DeepEqual(a, b)
+}
+
+// quietNow reports whether notifications are suppressed by quiet hours.
+func (e *Engine) quietNow() bool {
+	return e.quiet != nil && e.quiet.Contains(e.clock.Now().In(e.loc))
 }
 
 func (e *Engine) startWorker(s config.Settings) {
@@ -440,7 +464,7 @@ func (e *Engine) emitCheckRec(m *monState, n *event.Notification, record bool) {
 	}
 	last := ev
 	m.last = &last
-	if n != nil {
+	if n != nil && !m.settings.Monitor.Muted && !e.quietNow() {
 		ev.Notify, ev.Notification = true, n
 	}
 	e.sink.Emit(ev)
@@ -506,6 +530,14 @@ func plural(n int, one, many string) string {
 	return fmt.Sprintf("%d %s", n, many)
 }
 
+// notifyNotice attaches a notification unless quiet hours suppress it.
+func (e *Engine) notifyNotice(n *event.Notice, note *event.Notification) {
+	if e.quietNow() {
+		return
+	}
+	n.Notify, n.Notification = true, note
+}
+
 // enterOffline switches every monitor to UNKNOWN and sends one notification.
 func (e *Engine) enterOffline(d diagnose.Diagnosis) {
 	now := e.clock.Now()
@@ -518,9 +550,8 @@ func (e *Engine) enterOffline(d diagnose.Diagnosis) {
 	}
 	msg := fmt.Sprintf("%s %s paused until the network returns.", sentence(d.Summary), plural(n, "monitor", "monitors"))
 	notice := event.NewNotice(now, event.NoticeOffline, msg)
-	notice.Notify = true
-	notice.Notification = &event.Notification{ID: fmt.Sprintf("offline:%d", now.UnixMilli()), Title: title,
-		Body: msg, Urgency: "critical"}
+	e.notifyNotice(&notice, &event.Notification{ID: fmt.Sprintf("offline:%d", now.UnixMilli()), Title: title,
+		Body: msg, Urgency: "critical"})
 	e.sink.Emit(notice)
 	for _, id := range e.order {
 		e.emitCheckRec(e.mons[id], nil, true)
@@ -628,9 +659,8 @@ func (e *Engine) exitOffline() {
 	}
 	msg := fmt.Sprintf("Checks resumed for %s.", plural(e.active(), "monitor", "monitors"))
 	notice := event.NewNotice(now, event.NoticeOnline, msg)
-	notice.Notify = true
-	notice.Notification = &event.Notification{ID: fmt.Sprintf("online:%d", now.UnixMilli()), Title: "Back online",
-		Body: msg, Urgency: "normal"}
+	e.notifyNotice(&notice, &event.Notification{ID: fmt.Sprintf("online:%d", now.UnixMilli()), Title: "Back online",
+		Body: msg, Urgency: "normal"})
 	e.sink.Emit(notice)
 	for _, id := range e.order {
 		if m := e.mons[id]; !m.checkedAt.IsZero() || m.display() == event.StatusPaused {
@@ -660,12 +690,14 @@ func (e *Engine) vpnWentDown(m *monState, d diagnose.Diagnosis) {
 	}
 	e.vpnDown[iface] = true
 	var names []string
+	allMuted := true
 	for _, id := range e.order {
 		o := e.mons[id]
 		if ifaceOf(o) != iface || o.settings.Monitor.Paused {
 			continue
 		}
 		names = append(names, o.info.Name)
+		allMuted = allMuted && o.settings.Monitor.Muted
 		o.vpnPaused = true
 		if o != m {
 			o.observedDiag = d
@@ -675,9 +707,10 @@ func (e *Engine) vpnWentDown(m *monState, d diagnose.Diagnosis) {
 	msg := fmt.Sprintf("%s paused: VPN interface %s is down.", strings.Join(names, ", "), iface)
 	notice := event.NewNotice(now, event.NoticeVPNDown, msg)
 	notice.Monitors = names
-	notice.Notify = true
-	notice.Notification = &event.Notification{ID: fmt.Sprintf("vpn:%s:down:%d", iface, now.UnixMilli()),
-		Title: "VPN " + iface + " is down", Body: msg, Urgency: "normal"}
+	if !allMuted {
+		e.notifyNotice(&notice, &event.Notification{ID: fmt.Sprintf("vpn:%s:down:%d", iface, now.UnixMilli()),
+			Title: "VPN " + iface + " is down", Body: msg, Urgency: "normal"})
+	}
 	e.sink.Emit(notice)
 	for _, id := range e.order {
 		if o := e.mons[id]; o.vpnPaused && ifaceOf(o) == iface {
@@ -714,8 +747,7 @@ func (e *Engine) vpnCameBack(m *monState) {
 	now := e.clock.Now()
 	msg := fmt.Sprintf("%s resumed.", plural(n, "monitor", "monitors"))
 	notice := event.NewNotice(now, event.NoticeVPNUp, msg)
-	notice.Notify = true
-	notice.Notification = &event.Notification{ID: fmt.Sprintf("vpn:%s:up:%d", iface, now.UnixMilli()),
-		Title: "VPN " + iface + " is back", Body: msg, Urgency: "low"}
+	e.notifyNotice(&notice, &event.Notification{ID: fmt.Sprintf("vpn:%s:up:%d", iface, now.UnixMilli()),
+		Title: "VPN " + iface + " is back", Body: msg, Urgency: "low"})
 	e.sink.Emit(notice)
 }

@@ -17,7 +17,7 @@ import (
 
 func runMonitor(ctx context.Context, env Env, args []string) int {
 	if len(args) == 0 {
-		return usageError(env, "monitor: subcommand required: add, list, show, edit, rm, pause, resume")
+		return usageError(env, "monitor: subcommand required: add, list, show, edit, rm, pause, resume, mute, unmute")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -35,6 +35,10 @@ func runMonitor(ctx context.Context, env Env, args []string) int {
 		return monitorSetPaused(env, rest, true)
 	case "resume", "unpause":
 		return monitorSetPaused(env, rest, false)
+	case "mute":
+		return monitorSetFlag(env, rest, "mute", func(m *config.Monitor) { m.Muted = true })
+	case "unmute":
+		return monitorSetFlag(env, rest, "unmute", func(m *config.Monitor) { m.Muted = false })
 	}
 	return usageError(env, "monitor: unknown subcommand %q", sub)
 }
@@ -227,6 +231,7 @@ type view struct {
 	TimeoutS         float64  `json:"timeout_s"`
 	ExpectStatus     []int    `json:"expect_status"`
 	Paused           bool     `json:"paused"`
+	Muted            bool     `json:"muted"`
 	Auth             string   `json:"auth,omitempty"`
 	AuthSecret       string   `json:"auth_secret,omitempty"` // the reference name, not the value
 	AuthHeader       string   `json:"auth_header,omitempty"`
@@ -245,7 +250,7 @@ func monitorView(s config.Settings, raw bool) view {
 		target = m.Endpoint()
 	}
 	v := view{ID: m.ID, Name: m.Name, Kind: m.Kind(), Target: target, IntervalS: int(s.Interval.Seconds()),
-		TimeoutS: s.Timeout.Seconds(), ExpectStatus: m.ExpectStatus, Paused: m.Paused, InsecureTLS: m.InsecureTLS,
+		TimeoutS: s.Timeout.Seconds(), ExpectStatus: m.ExpectStatus, Paused: m.Paused, Muted: m.Muted, InsecureTLS: m.InsecureTLS,
 		CAFile: m.CAFile, FollowRedirects: s.FollowRedirects, AllowedRedirects: m.AllowedRedirectHosts}
 	if v.ExpectStatus == nil {
 		v.ExpectStatus = []int{}
@@ -392,6 +397,11 @@ func monitorSetPaused(env Env, args []string, paused bool) int {
 	if paused {
 		name = "pause"
 	}
+	return monitorSetFlag(env, args, name, func(m *config.Monitor) { m.Paused = paused })
+}
+
+// monitorSetFlag applies a small change to one monitor (pause, mute, ...).
+func monitorSetFlag(env Env, args []string, name string, apply func(*config.Monitor)) int {
 	fs := newFlagSet("monitor "+name, env)
 	jsonOut := fs.Bool("json", false, "print JSON")
 	if code, ok := parseFlags(fs, reorder(args)); !ok {
@@ -413,7 +423,7 @@ func monitorSetPaused(env Env, args []string, paused bool) int {
 	if i < 0 {
 		return fail(env, *jsonOut, rt.redactor, ExitUsage, fmt.Sprintf("monitor %q not found", id))
 	}
-	cfg.Monitors[i].Paused = paused
+	apply(&cfg.Monitors[i])
 	if err := cfg.Save(rt.paths.ConfigFile); err != nil {
 		return fail(env, *jsonOut, rt.redactor, ExitInternal, validationProblems(err)...)
 	}
@@ -421,6 +431,6 @@ func monitorSetPaused(env Env, args []string, paused bool) int {
 	if *jsonOut {
 		return printJSON(env, nil, result{OK: true, ID: id})
 	}
-	fmt.Fprintf(env.Stdout, "Monitor '%s' %sd.\n", id, name)
+	fmt.Fprintf(env.Stdout, "Monitor '%s': %s done.\n", id, name)
 	return ExitOK
 }

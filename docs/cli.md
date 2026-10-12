@@ -63,7 +63,12 @@ sebab monitor edit ID --interval 5m --expect 200
 sebab monitor pause ID
 sebab monitor resume ID
 sebab monitor rm ID
+sebab monitor mute ID        # keep checking and showing it, never notify
+sebab monitor unmute ID
 ```
+
+Quiet hours: `[defaults] quiet_hours = "22:00-07:00"` (local time, may wrap midnight) suppresses every
+notification in that window; states are still tracked and shown.
 
 `add` and `edit` run a test check first and print it (skip with `--no-test`).
 Validation errors are specific ("interval below 30s", "missing port"). With

@@ -411,6 +411,7 @@ local function details(m)
   end
   local id = m.id
   local paused = m.paused == true
+  local muted = m.muted == true
   table.insert(rows, ui.row({ gap = 6 }, {
     ui.button({ text = tr("panel.check_now"), glyph = "refresh", controlSize = "sm", variant = "secondary",
       onClick = function() simple({ "refresh", id }, tr("panel.busy_refresh"), tr("panel.refresh_sent")) end }),
@@ -422,6 +423,11 @@ local function details(m)
       tooltip = paused and tr("panel.resume") or tr("panel.pause"),
       onClick = function()
         simple({ "monitor", paused and "resume" or "pause", id, "--json" }, tr("panel.busy_save"), nil)
+      end }),
+    ui.button({ glyph = muted and "bell" or "bell-off", controlSize = "sm", variant = "ghost",
+      tooltip = muted and tr("panel.unmute") or tr("panel.mute"),
+      onClick = function()
+        simple({ "monitor", muted and "unmute" or "mute", id, "--json" }, tr("panel.busy_save"), nil)
       end }),
     ui.button({ glyph = "trash", controlSize = "sm", variant = "ghost", tooltip = tr("panel.delete"),
       onClick = function() confirmId, view = id, "confirm"; render() end }),
@@ -440,6 +446,7 @@ local function monitorRow(m)
     pill(m.status),
     ui.label({ text = m.name or m.id, flexGrow = 1, maxLines = 1 }),
     m.insecure and ui.glyph({ name = "shield-off", size = 14, color = "error" }) or ui.spacer({ width = 0 }),
+    m.muted and ui.glyph({ name = "bell-off", size = 14, color = "on_surface_variant" }) or ui.spacer({ width = 0 }),
     muted(type(latency) == "number" and `{math.floor(latency)} ms` or "-"),
     muted(m.checkedAt and common.ago(nowS - m.checkedAt) or tr("time.never"), { width = 72, textAlign = "end" }),
     ui.glyph({ name = open and "chevron-down" or "chevron-right", size = 14, color = "on_surface_variant" }),
