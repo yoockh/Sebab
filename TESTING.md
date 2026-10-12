@@ -234,6 +234,51 @@ the laptop: a "system resumed: checks continue in 15s" notice and no false alert
 mute <id>`; `[[notify]]` channels with `sebab notify-test` (point a webhook at `python3 -m http.server` on loopback
 to see the POST, or at your own ntfy/Telegram).
 
+## 5b. Panel UX and reliability pass (items 1 to 7)
+
+Reload the plugin once after pulling (the panel size and outside-click setting are read on enable):
+`noctalia msg plugins disable yoockh/sebab && noctalia msg plugins enable yoockh/sebab`.
+Everything below can also be driven over IPC: `noctalia msg plugin yoockh/sebab:panel all <event>` with
+`add [url]`, `test`, `save`, `cancel`, `help`, `monitors`, `incidents`.
+
+**Item 7, Save persists**
+1. `mv ~/.config/sebab/config.toml /tmp/` (if it exists) to start from the first-run state.
+2. Panel → + → name `Local test`, URL `http://127.0.0.1:9/` (nothing listens, nothing leaves the machine).
+3. "Test, then save": the result card shows DOWN, "Host reachable, nothing listening on 9", their side.
+4. "Save": the list comes back with the row highlighted and "Saved Local test. / Saved to
+   ~/.config/sebab/config.toml" at the bottom. `cat ~/.config/sebab/config.toml` shows the monitor; the file is
+   0600, the directory 0700.
+5. Persistence: `noctalia msg plugins disable yoockh/sebab; noctalia msg plugins enable yoockh/sebab`, reopen:
+   the monitor is listed. Restart Noctalia itself (log out and in, or restart its service) and check again. With
+   the daemon: `systemctl --user restart sebab.service` (or stop/start `sebab daemon`): still listed.
+6. Error path: temporarily `chmod 500 ~/.config/sebab`, add another monitor: the card says "Could not save the
+   monitor." plus the CLI's first line (permission denied). `chmod 700 ~/.config/sebab` afterwards.
+7. Clean up: delete the row (trash icon) and, if you moved one, restore your config.
+
+**Item 1, layout:** the add form fills the panel: header (title, i, X) at the top, fields scroll in the middle,
+Cancel/Test/Save at the bottom edge with no gap under them. Resize nothing; the panel is 520x720.
+
+**Item 2, result card:** before a test the card reads "Press Test to see which layer fails". After a test it shows
+the pill, the cause sentence, the next step, the side and six layer chips (Local, VPN, DNS, TCP, TLS, HTTP) with ms
+values; a bad target such as `example.com` shows the red error card instead. Nothing needs scrolling.
+
+**Item 3, save flow:** after Save the list reappears, the new row is highlighted for about 5 s, the "Saved" lines
+fade after about 5 s, and + opens an empty form. A failed save keeps the form and the typed values. Cancel
+returns to the list and + opens an empty form again.
+
+**Item 4, outside click (needs your mouse):** open the panel, click on a window outside it: it closes. While it is
+open you can type in other windows. Type a name, URL and a token, click outside, reopen: name and URL are still
+there, the token field is empty and needs typing again (it is never kept or written).
+
+**Item 5, help:** the "i" button opens "How Sebab works" (what it does, adding a monitor, the six layers, your side
+vs their side, tokens, config location); Back returns to the list or to the form with the draft intact. Every form
+field has a grey one-line hint under it.
+
+**Item 6, dashboard:** the Monitors tab starts with an Overview card (coloured count bar, "N% up, last 24 h"); each
+row has a 24-segment strip (one per hour) and a small latency line. The Incidents tab lists status changes with
+time, status, monitor, code, summary and side. With no history the card says "no history yet" and the tab says
+"No status changes in the last 24 h.". `sebab overview --json` prints the same data.
+
 ## 6. Releasing (needs you)
 
 1. Create/choose a GPG key, `export GPG_FINGERPRINT=...`.
@@ -247,8 +292,8 @@ to see the POST, or at your own ntfy/Telegram).
 
 ## 7. Known issues and limits
 
-- **Widget placement and visuals were not checked by a human.** The plugin loads, the service streams, the panel
-  renders list and form in the real shell with no warnings, but nobody has looked at the widget on a bar yet.
+- **Outside-click dismissal** was verified from Noctalia's source and the manifest, not by a real click (no input
+  injection tool is installed); see item 4 above.
 - **Notification history:** Noctalia shows plugin notifications as toasts but does not write them to
   `notification_history.json`.
 - **Plugin `thumbnail.webp` is missing** (required by the catalog CI; the validator reports only this).

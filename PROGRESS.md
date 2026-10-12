@@ -14,6 +14,18 @@ docs site, Indonesian translation (Noctalia Translate), signed releases and 1.0 
 This file is the resume point for any future session. Status values: `todo`, `wip`, `done`, `blocked`, `needs human`.
 A story's acceptance criteria are ticked only when a test or a verified manual run proves them (the proof is named).
 
+## Panel UX and reliability pass (owner feedback, 2026-10-12)
+
+| Item | Status | Proof | Commit |
+|---|---|---|---|
+| 7. Save does not persist (root cause D23) | done | `panel_save_test.luau` (failed before the fix), cli TestPanelSavePathPersistsAcrossDaemonRestart, real shell: saved via panel, file 0600, survived plugin disable/enable | a2d4098 |
+| 1. Layout: pinned header/footer, no dead space (D26) | done | `panel_layout_test.luau`, grim screenshots of list and form | 21fdc22 |
+| 2. Result card always visible (D27) | done | `panel_card_test.luau`, grim screenshots of placeholder, result and error | d5b4f5f |
+| 3. Save flow: back to list, flash row, clear form (D28) | done | `panel_save_test.luau` (highlight, expiry, cancel), grim screenshot | a277fc6 |
+| 4. Dismiss on outside click, wipe secrets on close (D29) | done; the click itself needs a human | `panel_close_test.luau` (token gone from files, argv and form) | 4cba03a |
+| 5. Help view and field hints (D30) | done | `panel_help_test.luau`, grim screenshot | b613df3 |
+| 6. Overview card, strips, sparklines, incidents tab (D31) | done | `panel_dashboard_test.luau`, history TestOverview, cli TestOverviewCommand, grim screenshots | 2367706 |
+
 ## Phase 0: foundations
 
 | Item | Status | Commit |
@@ -142,8 +154,8 @@ Story 12: Install and setup (Must)
 
 ## Needs human
 
-- Phase 0 exit visual check: place the widget on a bar (Settings → Bar → add "Sebab"), then confirm it renders.
-  Not done automatically because it edits the personal bar layout in `~/.local/state/noctalia/settings.toml`.
+- Panel outside-click dismissal: click outside the open panel once to confirm it closes (TESTING.md 5b item 4).
+- Restarting Noctalia itself with a saved monitor (plugin disable/enable and engine restarts were verified).
 - Phase 1 exit: 30 days of dogfooding with >= 90% diagnosis accuracy.
 - Phase 3 exit: file a real bug report with an exported incident report.
 - Phase 2 exit: catalog submission to noctalia-dev/community-plugins; "same engine drives Noctalia and Waybar at
