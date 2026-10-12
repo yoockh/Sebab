@@ -28,10 +28,16 @@ type CanaryChecker struct {
 
 // Check runs (or reuses) a canary round. withDNS also resolves the DNS canary names.
 func (c *CanaryChecker) Check(ctx context.Context, withDNS bool) diagnose.Canary {
-	if len(c.Targets) == 0 {
+	c.mu.Lock()
+	disabled := len(c.Targets) == 0
+	c.mu.Unlock()
+	if disabled {
 		v := diagnose.Canary{Disabled: true}
-		if withDNS && len(c.DNSNames) > 0 {
-			v.DNSChecked, v.DNSOK = true, c.checkDNS(ctx)
+		c.mu.Lock()
+		names := c.DNSNames
+		c.mu.Unlock()
+		if withDNS && len(names) > 0 {
+			v.DNSChecked, v.DNSOK = true, c.checkDNS(ctx, names)
 		}
 		return v
 	}
@@ -65,6 +71,14 @@ func (c *CanaryChecker) Check(ctx context.Context, withDNS bool) diagnose.Canary
 	}
 }
 
+// Configure replaces the canary targets (config reload).
+func (c *CanaryChecker) Configure(targets, dnsNames []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Targets, c.DNSNames = targets, dnsNames
+	c.lastAt = time.Time{}
+}
+
 // Invalidate drops the cached verdict (used when the network changes).
 func (c *CanaryChecker) Invalidate() {
 	c.mu.Lock()
@@ -73,9 +87,12 @@ func (c *CanaryChecker) Invalidate() {
 }
 
 func (c *CanaryChecker) run(ctx context.Context, withDNS bool) diagnose.Canary {
-	v := diagnose.Canary{Checked: true, OK: c.checkTCP(ctx)}
-	if withDNS && len(c.DNSNames) > 0 {
-		v.DNSChecked, v.DNSOK = true, c.checkDNS(ctx)
+	c.mu.Lock()
+	targets, names := c.Targets, c.DNSNames
+	c.mu.Unlock()
+	v := diagnose.Canary{Checked: true, OK: c.checkTCP(ctx, targets)}
+	if withDNS && len(names) > 0 {
+		v.DNSChecked, v.DNSOK = true, c.checkDNS(ctx, names)
 	}
 	return v
 }
@@ -88,11 +105,11 @@ func (c *CanaryChecker) timeout() time.Duration {
 }
 
 // checkTCP connects to every target in parallel; one success is enough.
-func (c *CanaryChecker) checkTCP(ctx context.Context) bool {
+func (c *CanaryChecker) checkTCP(ctx context.Context, targets []string) bool {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout())
 	defer cancel()
-	results := make(chan bool, len(c.Targets))
-	for _, target := range c.Targets {
+	results := make(chan bool, len(targets))
+	for _, target := range targets {
 		go func(target string) {
 			host, port, err := config.ParseTCPTarget(target)
 			if err != nil {
@@ -118,7 +135,7 @@ func (c *CanaryChecker) checkTCP(ctx context.Context) bool {
 		}(target)
 	}
 	ok := false
-	for range c.Targets {
+	for range targets {
 		if <-results {
 			ok = true
 			cancel() // stop the others early
@@ -127,10 +144,10 @@ func (c *CanaryChecker) checkTCP(ctx context.Context) bool {
 	return ok
 }
 
-func (c *CanaryChecker) checkDNS(ctx context.Context) bool {
+func (c *CanaryChecker) checkDNS(ctx context.Context, names []string) bool {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout())
 	defer cancel()
-	for _, name := range c.DNSNames {
+	for _, name := range names {
 		if _, err := c.Prober.Resolver.Lookup(ctx, name); err == nil {
 			return true
 		}
